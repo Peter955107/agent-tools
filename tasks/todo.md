@@ -21,7 +21,7 @@
 - [x] 任務 8：觸發停止、prompt.lock、decision.json、繼續（snooze）或停止、events.log（M）
 - [x] 任務 9：已停止狀態、收尾模式、允許清單、`resume`／`snooze` 指令（M）
 - [x] 任務 10：ask 備援、PostToolUse 核准偵測、無人值守時直接停止（S）
-- [ ] 任務 11：自我保護（狀態資料夾、credentials、uninstall 輸出 ask）（S）
+- [x] 任務 11：自我保護（狀態資料夾、credentials、uninstall 輸出 ask）（S）
 - [ ] **檢查點 3**：驗收 1–10、15、16 通過
 
 ## 第四階段：周邊與移除

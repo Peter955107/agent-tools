@@ -1,9 +1,14 @@
 import { activeStop, askResponse, resolveStop, stopModeResponse } from '../decision.mjs';
 import { dialogFor } from '../dialog.mjs';
 import { injectionFor, injectionOutput, usageState } from '../inject.mjs';
+import { selfProtection, selfProtectionOutput } from '../self-protect.mjs';
 import { loadConfig } from '../state.mjs';
 
 async function decide(input, { dir, env }, config) {
+  // 自我保護在任何分段都生效，也優先於收尾允許清單（FR-4.8）。
+  const protection = selfProtection(input, { env });
+  if (protection) return selfProtectionOutput(protection);
+
   const nowMs = Date.now();
   // 已停止狀態每次都要重新套用：視窗重新載入會自動接續被中斷的回合（A20）。
   const stop = activeStop(dir, nowMs);
