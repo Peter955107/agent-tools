@@ -20,13 +20,23 @@ function cleanEnv() {
   return env;
 }
 
-// 以子程序執行 hook 腳本，模擬 Claude Code 把 JSON 從 stdin 傳入。
-// env 必須帶 USAGE_SENTINEL_DIR，避免測試碰到真正的 ~/.claude。input 為字串時原樣送出。
+// 測試用的隔離環境：空的 CLAUDE_CONFIG_DIR（沒有 credentials），端點指向連不上的本機位址，
+// 確保測試絕不會讀到真正的 token、也不會打到真正的 usage 端點。
+export function isolatedEnv(env) {
+  if (!env.USAGE_SENTINEL_DIR) throw new Error('測試需要 USAGE_SENTINEL_DIR');
+  return {
+    ...cleanEnv(),
+    CLAUDE_CONFIG_DIR: tempDir(),
+    USAGE_SENTINEL_ENDPOINT: 'http://127.0.0.1:9/api/oauth/usage',
+    ...env,
+  };
+}
+
+// 以子程序執行 hook 腳本，模擬 Claude Code 把 JSON 從 stdin 傳入。input 為字串時原樣送出。
 export function runHook(script, { input = {}, env = {} } = {}) {
-  if (!env.USAGE_SENTINEL_DIR) throw new Error('runHook 需要 USAGE_SENTINEL_DIR');
   const result = spawnSync(process.execPath, [join(ROOT, 'scripts', script)], {
     input: typeof input === 'string' ? input : JSON.stringify(input),
-    env: { ...cleanEnv(), ...env },
+    env: isolatedEnv(env),
     encoding: 'utf8',
     timeout: 20000,
   });

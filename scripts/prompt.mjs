@@ -3,5 +3,6 @@ import { shouldRun } from './gate.mjs';
 
 if (shouldRun()) {
   const { runHook } = await import('./hook-runner.mjs');
-  await runHook('UserPromptSubmit', () => undefined);
+  const { handleUserPromptSubmit } = await import('./handlers/user-prompt-submit.mjs');
+  await runHook('UserPromptSubmit', handleUserPromptSubmit);
 }

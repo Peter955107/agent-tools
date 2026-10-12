@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, runHook, tempDir } from '../test-support/helpers.mjs';
+import { ROOT, isolatedEnv, runHook, tempDir } from '../test-support/helpers.mjs';
 
 const inHours = (h) => Math.floor(Date.now() / 1000) + h * 3600;
 
@@ -90,7 +90,7 @@ describe('guard.mjs 注入', () => {
       Array.from({ length: 6 }, () =>
         new Promise((resolve, reject) => {
           const child = spawn(process.execPath, [join(ROOT, 'scripts', 'guard.mjs')], {
-            env: { ...process.env, USAGE_SENTINEL_DIR: dir },
+            env: isolatedEnv({ USAGE_SENTINEL_DIR: dir }),
           });
           let out = '';
           child.stdout.on('data', (d) => (out += d));
@@ -112,9 +112,11 @@ describe('guard.mjs 注入', () => {
     assert.equal(log[0].hook, 'PreToolUse');
   });
 
-  test('fake-usage.json 壞掉時 fail-open：exit 0、不輸出', () => {
+  test('fake-usage.json 壞掉時視為沒有資料：不阻擋，只注入不可用（FR-3）', () => {
     const dir = tempDir();
     writeFileSync(join(dir, 'fake-usage.json'), '{ broken');
-    assert.equal(callGuard(dir), null);
+    const output = callGuard(dir);
+    assert.match(output.hookSpecificOutput.additionalContext, /用量資料不可用/);
+    assert.equal(output.hookSpecificOutput.permissionDecision, undefined);
   });
 });

@@ -49,7 +49,57 @@ export function readFakeUsage(dir, nowMs) {
   return windows ? { source: 'fake', observed_at: observedAt, windows } : null;
 }
 
-const OFFICIAL_ENDPOINT = 'https://api.anthropic.com/api/oauth/usage';
+// 端點每次回傳的重置時間小數秒都不同（.833、.380），差距在 60 秒內就視為同一週期。
+function sameCycle(a, b) {
+  if (a.resets_at === null || b.resets_at === null) return a.resets_at === b.resets_at;
+  return Math.abs(a.resets_at - b.resets_at) < 60;
+}
+
+// 兩個來源以較新的觀察為準；同一週期內百分比只升不降，避免舊資料蓋掉新資料（FR-1）。
+export function mergeWindow(existing, incoming) {
+  if (!existing) return incoming;
+  if (!sameCycle(existing, incoming)) return incoming.observed_at > existing.observed_at ? incoming : existing;
+  const newer = incoming.observed_at >= existing.observed_at ? incoming : existing;
+  return { ...newer, pct: Math.max(existing.pct, incoming.pct) };
+}
+
+export function mergeWindows(existing = {}, incoming = {}) {
+  const merged = { ...existing };
+  for (const [name, win] of Object.entries(incoming)) merged[name] = mergeWindow(existing[name], win);
+  return merged;
+}
+
+function describePollFailure(poll, now) {
+  const status = poll?.status;
+  switch (status?.code) {
+    case 'token_expired':
+      return 'token 已過期，等 Claude Code 刷新';
+    case 'credentials_invalid':
+      return '憑證無效';
+    case 'rate_limited':
+      return `429 退避中（剩 ${Math.max(0, Math.ceil((poll.backoff_until ?? now) - now))} 秒）`;
+    case 'network_error':
+      return status.detail ? `網路錯誤（${status.detail}）` : '網路錯誤';
+    case 'schema_changed':
+      return `回應格式改變（欄位：${(status.fields ?? []).join(', ') || '無'}）`;
+    default:
+      return null;
+  }
+}
+
+// 判斷資料能不能用來做決定（FR-3）。不可用時回傳可區分的原因文字。
+export function assessUsage(snapshot, poll, config, nowMs) {
+  const now = nowMs / 1000;
+  if (snapshot?.source === 'fake') return { available: true };
+  const failure = describePollFailure(poll, now);
+  if (!snapshot) return { available: false, reason: failure ?? '尚未取得' };
+  const age = now - snapshot.observed_at;
+  if (age <= config.stale_after_seconds) return { available: true };
+  const stale = `資料已過期 ${Math.floor(age / 60)} 分鐘`;
+  return { available: false, reason: failure ? `${failure}；${stale}` : stale };
+}
+
+const OFFICIAL_ENDPOINT ='https://api.anthropic.com/api/oauth/usage';
 const DEFAULT_RETRY_AFTER = 300;
 const MAX_BODY_BYTES = 1024 * 1024;
 
@@ -160,7 +210,7 @@ async function attemptPoll({ dir, config, env, now, nowMs, timeoutMs }, poll) {
     const fields = body && typeof body === 'object' && !Array.isArray(body) ? Object.keys(body).sort() : [];
     return { ...next, status: { code: 'schema_changed', at: now, fields } };
   }
-  writeJson(join(dir, 'cache.json'), { windows });
+  writeJson(join(dir, 'cache.json'), { windows: mergeWindows(readCache(dir)?.windows, windows) });
   return { ...next, status: { code: 'ok', at: now } };
 }
 
