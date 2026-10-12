@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { STOP_REASONS, activeStop } from './decision.mjs';
 import { buildStopDialog, showDialog } from './dialog.mjs';
 import { stateDir } from './gate.mjs';
+import { installStatusline } from './install-statusline.mjs';
 import { DEFAULT_CONFIG, loadConfig, mergeConfig, readJson, validateConfig, writeJson } from './state.mjs';
 import { computeTier, formatDuration } from './tiers.mjs';
 import { assessUsage, describePollFailure, getUsage, readPollState } from './usage.mjs';
@@ -17,6 +18,7 @@ const USAGE = [
   '  snooze <分鐘|clear>    暫時不詢問（到 99% 仍會問），或清除所有 snooze',
   '  resume                 解除「已停止」狀態',
   '  test-dialog            用假資料跳出一次停止對話框，回報選擇與耗時',
+  '  install-statusline     （選配，只有終端機 CLI 有效）把 statusLine 指向本工具，原本的接在後面',
 ].join('\n');
 
 const WINDOW_LABELS = { five_hour: '5 小時', seven_day: '7 天' };
@@ -200,6 +202,8 @@ export async function runCli(args, { env = process.env, dialog = showDialog } = 
       return testDialog(dir, dialog);
     case 'resume':
       return resume(dir);
+    case 'install-statusline':
+      return installStatusline({ env });
     case 'snooze':
       return rest.length === 1 ? snooze(dir, rest[0]) : fail(USAGE);
     default:

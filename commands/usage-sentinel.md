@@ -1,6 +1,6 @@
 ---
 description: usage-sentinel 用量守衛：status、on、off、set、snooze、resume、test-dialog
-argument-hint: status | on | off | set <key> <value> | snooze <分鐘|clear> | resume | test-dialog
+argument-hint: status | on | off | set <key> <value> | snooze <分鐘|clear> | resume | test-dialog | install-statusline
 allowed-tools: Bash(node:*)
 disable-model-invocation: true
 ---
