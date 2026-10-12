@@ -33,6 +33,7 @@ $row = New-Object System.Windows.Forms.FlowLayoutPanel
 $row.FlowDirection = 'LeftToRight'
 $row.AutoSize = $true
 $script:choice = -1
+$script:defaultButton = $null
 $labels = $env:USAGE_SENTINEL_DIALOG_BUTTONS -split "\`n"
 $defaultIndex = [int]$env:USAGE_SENTINEL_DIALOG_DEFAULT
 for ($i = 0; $i -lt $labels.Count; $i++) {
@@ -42,11 +43,13 @@ for ($i = 0; $i -lt $labels.Count; $i++) {
   $button.Tag = $i
   $button.Add_Click({ $script:choice = $this.Tag; $form.Close() })
   $row.Controls.Add($button)
-  if ($i -eq $defaultIndex) { $form.AcceptButton = $button; $form.ActiveControl = $button }
+  if ($i -eq $defaultIndex) { $form.AcceptButton = $button; $script:defaultButton = $button }
 }
 $layout.Controls.Add($row)
 $form.Controls.Add($layout)
-$form.Add_Shown({ $form.Activate() })
+# 按鈕要等視窗顯示後才能取得焦點；在加入視窗前設定 ActiveControl 會丟出例外。
+$form.Add_Shown({ $form.Activate(); if ($script:defaultButton) { [void]$script:defaultButton.Focus() } })
+if ($env:USAGE_SENTINEL_DIALOG_SELFTEST -eq '1') { [Console]::Out.Write('selftest'); exit 0 }
 [void]$form.ShowDialog()
 [Console]::Out.Write($script:choice)
 `;
@@ -66,10 +69,18 @@ export function powershellLaunch(spec) {
   };
 }
 
-// 回傳 { choice, elapsedMs }。choice 為按鈕 id，或 'dismissed'（關閉視窗）、'timeout'、'unavailable'。
+// PowerShell 把錯誤以 CLIXML 寫到 stderr（A14），取出可讀的錯誤訊息。
+function powershellErrors(stderr) {
+  const errors = [...stderr.matchAll(/<S S="Error">([\s\S]*?)<\/S>/g)].map((m) => m[1].replace(/_x000D__x000A_/g, ' ').trim());
+  const text = errors.length ? errors.filter(Boolean).join(' ') : stderr.replace('#< CLIXML', '').trim();
+  return text.slice(0, 500);
+}
+
+// 回傳 { choice, elapsedMs, detail? }。choice 為按鈕 id，或 'dismissed'（關閉視窗）、'timeout'、'unavailable'；
+// unavailable 時 detail 說明原因。
 export function showDialog(spec, { platform = process.platform, launch, onSpawn } = {}) {
   const started = Date.now();
-  const done = (choice) => ({ choice, elapsedMs: Date.now() - started });
+  const done = (choice, detail) => ({ choice, elapsedMs: Date.now() - started, ...(detail && { detail }) });
   if (!launch) {
     if (platform !== 'win32') return Promise.resolve(done('unavailable')); // macOS／Linux 見任務 16
     launch = powershellLaunch;
@@ -78,18 +89,18 @@ export function showDialog(spec, { platform = process.platform, launch, onSpawn 
 
   return new Promise((resolve) => {
     let settled = false;
-    const finish = (choice) => {
+    const finish = (choice, detail) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve(done(choice));
+      resolve(done(choice, detail));
     };
 
     let child;
     try {
-      child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: false });
-    } catch {
-      resolve(done('unavailable'));
+      child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: false });
+    } catch (error) {
+      resolve(done('unavailable', error.code || error.message));
       return;
     }
     const timer = setTimeout(() => {
@@ -98,15 +109,21 @@ export function showDialog(spec, { platform = process.platform, launch, onSpawn 
     }, spec.timeoutSeconds * 1000);
 
     let stdout = '';
+    let stderr = '';
     child.stdout.on('data', (chunk) => (stdout += chunk));
+    child.stderr.on('data', (chunk) => (stderr += chunk));
     child.on('spawn', () => onSpawn?.(child.pid));
-    child.on('error', () => finish('unavailable'));
-    child.on('close', () => {
+    child.on('error', (error) => finish('unavailable', error.code || error.message));
+    child.on('close', (code) => {
       const trimmed = stdout.trim();
-      if (!/^-?\d+$/.test(trimmed)) return finish('unavailable');
+      if (trimmed === 'selftest') return finish('selftest');
+      if (!/^-?\d+$/.test(trimmed)) {
+        const errors = powershellErrors(stderr);
+        return finish('unavailable', `exit ${code}${errors ? `：${errors}` : ''}`);
+      }
       const index = Number(trimmed);
       if (index === -1) return finish('dismissed');
-      finish(spec.buttons[index]?.id ?? 'unavailable');
+      finish(spec.buttons[index]?.id ?? 'unavailable', `未知的按鈕索引 ${index}`);
     });
   });
 }
@@ -118,7 +135,7 @@ export function dialogFor(env) {
   const [choice, delay = '0'] = stub.split(':');
   return async () => {
     await new Promise((resolve) => setTimeout(resolve, Number(delay)));
-    return { choice, elapsedMs: Number(delay) };
+    return { choice, elapsedMs: Number(delay), ...(choice === 'unavailable' && { detail: 'stub' }) };
   };
 }
 

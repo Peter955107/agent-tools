@@ -47,6 +47,7 @@ describe('對話框不可用時改用 ask（FR-4.3 第 2 項）', () => {
     const [event] = events(dir);
     assert.equal(event.method, 'ask');
     assert.equal(event.choice, 'continue');
+    assert.match(event.dialog_detail, /stub/);
     assert.equal(decisionOf(hook('guard.mjs', dir, { tool_use_id: 'toolu_2' })), undefined);
   });
 

@@ -1,6 +1,6 @@
 {
   "name": "usage-sentinel",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Claude Code 用量守衛：接近 5 小時或每週用量上限時，提醒收尾、停下並詢問是否繼續。",
   "author": { "name": "peter.chou" },
   "license": "MIT"

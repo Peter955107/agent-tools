@@ -100,6 +100,28 @@ describe('執行本工具的指令', () => {
   test('其他專案的 cli.mjs 不受影響', () => {
     assert.equal(decision('Bash', { command: 'node scripts/cli.mjs build' }), null);
   });
+
+  test('在本工具的 repo 裡用相對路徑執行 cli.mjs → deny', () => {
+    const result = selfProtection(
+      { tool_name: 'Bash', tool_input: { command: 'node scripts/cli.mjs snooze 600' }, cwd: 'C:\\dev\\usage-sentinel' },
+      { env: ENV, platform: 'win32' },
+    );
+    assert.equal(result?.decision, 'deny');
+  });
+
+  // 回歸：只是提到 cli.mjs（例如用腳本修改它），而不是執行它，不應該被擋。
+  const notExecuting = [
+    `cd "C:/dev/usage-sentinel" && node -e "require('fs').readFileSync('scripts/cli.mjs')"`,
+    'cd C:/dev/usage-sentinel && git diff scripts/cli.mjs',
+    'cd C:/dev/usage-sentinel && grep -n status scripts/cli.mjs scripts/install-statusline.mjs',
+    'cd C:/dev/usage-sentinel && node --test test/cli.test.mjs',
+    'cd C:/dev/usage-sentinel && git diff scripts/uninstall.mjs',
+  ];
+  for (const command of notExecuting) {
+    test(`只是提到、沒有執行：${command}`, () => {
+      assert.equal(decision('Bash', { command }), null);
+    });
+  }
 });
 
 describe('guard.mjs 套用自我保護', () => {

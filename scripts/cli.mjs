@@ -166,8 +166,9 @@ async function testDialog(dir, dialog) {
     timeoutSeconds: config.prompt_timeout_seconds,
     fake: true,
   });
-  const { choice, elapsedMs } = await dialog(spec);
-  return ok(`test-dialog：${DIALOG_OUTCOMES[choice] ?? choice}，耗時 ${(elapsedMs / 1000).toFixed(1)} 秒`);
+  const { choice, elapsedMs, detail } = await dialog(spec);
+  const why = choice === 'unavailable' && detail ? `，原因：${detail}` : '';
+  return ok(`test-dialog：${DIALOG_OUTCOMES[choice] ?? choice}，耗時 ${(elapsedMs / 1000).toFixed(1)} 秒${why}`);
 }
 
 export async function runCli(args, { env = process.env, dialog = showDialog } = {}) {

@@ -45,6 +45,17 @@ function isInside(target, { dirs, files }) {
   return files.includes(target) || dirs.some((d) => target === d || target.startsWith(`${d}/`));
 }
 
+// 指令裡用 node 執行的 .mjs 腳本（解析成絕對路徑）。只是提到檔名（git diff、grep、node -e）不算執行。
+const NODE_SCRIPT = /(?:^|[\s;&|(])node(?:\.exe)?["']?\s+(?:-[^\s]+\s+)*["']?([^\s"';&|]+\.mjs)/g;
+
+function executedScripts(command, cwd, platform) {
+  return [...command.matchAll(NODE_SCRIPT)].map((m) => normalize(resolve(cwd, m[1]), platform));
+}
+
+function isOwnScript(path, name) {
+  return path.endsWith(`/${name}`) && path.includes('usage-sentinel');
+}
+
 // 回傳 { decision: 'deny' | 'ask', reason }；不需要介入時回傳 null。
 export function selfProtection(input, { env = process.env, platform = process.platform } = {}) {
   const paths = protectedPaths(env, platform);
@@ -59,10 +70,12 @@ export function selfProtection(input, { env = process.env, platform = process.pl
 
   if (!SHELL_TOOLS.has(input.tool_name) || typeof toolInput.command !== 'string') return null;
   const command = normalize(toolInput.command, platform);
-  const ownTool = command.includes('usage-sentinel');
+  const scripts = executedScripts(command, input.cwd || process.cwd(), platform);
   // 移除不直接擋：交給人決定（FR-8.2），避免 agent 為了繞過守衛自行移除。
-  if (ownTool && /uninstall\.mjs/.test(command)) return { decision: 'ask', reason: UNINSTALL_REASON };
-  if (ownTool && /(?:^|[/\s"'])(?:cli|install-statusline)\.mjs/.test(command)) return { decision: 'deny', reason: CLI_REASON };
+  if (scripts.some((s) => isOwnScript(s, 'uninstall.mjs'))) return { decision: 'ask', reason: UNINSTALL_REASON };
+  if (scripts.some((s) => isOwnScript(s, 'cli.mjs') || isOwnScript(s, 'install-statusline.mjs'))) {
+    return { decision: 'deny', reason: CLI_REASON };
+  }
   return commandTouchesProtected(command, paths) ? { decision: 'deny', reason: DENY_REASON } : null;
 }
 

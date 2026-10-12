@@ -96,6 +96,7 @@ async function askAndRecord(ctx, target) {
   let method = 'dialog';
   let dialogResult = null;
   let elapsedMs = 0;
+  let dialogDetail;
 
   // 取不到 CLAUDE_CODE_SESSION_ATTENDED 時視為有人值守（§9）。
   if (env.CLAUDE_CODE_SESSION_ATTENDED === '0') {
@@ -116,7 +117,7 @@ async function askAndRecord(ctx, target) {
         // 寫不進去只影響移除時的清理
       }
     };
-    ({ choice: dialogResult, elapsedMs } = await dialog(spec, { onSpawn }));
+    ({ choice: dialogResult, elapsedMs, detail: dialogDetail } = await dialog(spec, { onSpawn }));
   }
 
   // 對話框不可用：改用權限確認（ask），結果由 PostToolUse 或下一次呼叫判定（FR-4.3 第 2 項）。
@@ -130,6 +131,7 @@ async function askAndRecord(ctx, target) {
       at: Date.now(),
       source: snapshot.source,
       observed_at: snapshot.observed_at,
+      dialog_detail: dialogDetail,
     };
     writeJson(join(dir, 'pending-ask.json'), pending);
     return { kind: 'ask', pending };
@@ -151,7 +153,7 @@ async function askAndRecord(ctx, target) {
 }
 
 // 寫入一次決策：停止寫 stopped.json、繼續寫 snooze.json，並記錄 decision.json 與 events.log（FR-4.5、4.9）。
-function recordDecision(dir, config, { target, choice, reason, method, dialogResult, elapsedMs = 0, session, source, dataAge }) {
+function recordDecision(dir, config, { target, choice, reason, method, dialogResult, dialogDetail, elapsedMs = 0, session, source, dataAge }) {
   const done = Math.floor(Date.now() / 1000);
   let outcome;
   if (choice === 'stop') {
@@ -175,6 +177,7 @@ function recordDecision(dir, config, { target, choice, reason, method, dialogRes
     elapsed_ms: elapsedMs,
     source,
     data_age_seconds: dataAge,
+    ...(dialogDetail && { dialog_detail: dialogDetail }),
   });
   return outcome;
 }
@@ -203,6 +206,7 @@ function resolvePendingAsk(dir, config, pending, { choice, dialogResult }) {
     session: pending.session,
     source: pending.source,
     dataAge: Math.floor(pending.at / 1000) - pending.observed_at,
+    dialogDetail: pending.dialog_detail,
   });
 }
 

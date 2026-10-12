@@ -171,6 +171,11 @@ describe('test-dialog', () => {
     });
   }
 
+  test('對話框不可用時印出原因', async () => {
+    const { text } = await run(tempDir(), async () => ({ choice: 'unavailable', elapsedMs: 400, detail: 'exit 1：Exception setting "ActiveControl"' }));
+    assert.match(text, /原因：exit 1：Exception setting "ActiveControl"/);
+  });
+
   test('不寫入任何決策或狀態檔', async () => {
     const dir = tempDir();
     await run(dir, async () => ({ choice: 'continue', elapsedMs: 1 }));

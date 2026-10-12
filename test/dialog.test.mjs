@@ -45,7 +45,30 @@ describe('powershellLaunch', () => {
   });
 });
 
+// 回歸：單元測試只檢查腳本語法，沒有真的執行，漏掉了建立視窗時的例外（ActiveControl）。
+// 自我檢查模式會完整建立視窗，但在 ShowDialog 之前結束，不會在畫面上跳出視窗。
+describe('WinForms 腳本實際執行（只在 Windows）', { skip: process.platform !== 'win32' }, () => {
+  test('建立視窗時沒有例外', async () => {
+    const launch = (s) => {
+      const real = powershellLaunch(s);
+      return { ...real, env: { ...real.env, USAGE_SENTINEL_DIALOG_SELFTEST: '1' } };
+    };
+    const result = await showDialog({ ...spec, timeoutSeconds: 30 }, { launch });
+    assert.equal(result.detail, undefined, result.detail);
+    assert.equal(result.choice, 'selftest');
+  });
+});
+
 describe('showDialog', () => {
+  test('啟動失敗時回報 exit code 與 PowerShell 的錯誤訊息', async () => {
+    const stderr = '#< CLIXML\r\n<Objs><S S="Error">Exception setting "ActiveControl": "boom"_x000D__x000A_</S><S S="Error">At line:39_x000D__x000A_</S></Objs>';
+    const launch = () => ({ command: process.execPath, args: ['-e', `process.stderr.write(${JSON.stringify(stderr)}); process.exit(1)`], env: process.env });
+    const result = await showDialog(spec, { launch });
+    assert.equal(result.choice, 'unavailable');
+    assert.match(result.detail, /exit 1/);
+    assert.match(result.detail, /Exception setting "ActiveControl": "boom"/);
+  });
+
   test('回傳按下的按鈕 id，忽略 stderr 雜訊', async () => {
     const result = await showDialog(spec, { launch: fakeLaunch('0') });
     assert.equal(result.choice, 'continue');
