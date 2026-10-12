@@ -1,7 +1,8 @@
 // /usage-sentinel slash command 的後端（FR-6）。只由使用者執行；agent 的呼叫由 FR-4.8 擋下。
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { STOP_REASONS, activeStop } from './decision.mjs';
 import { buildStopDialog, showDialog } from './dialog.mjs';
 import { stateDir } from './gate.mjs';
 import { DEFAULT_CONFIG, loadConfig, mergeConfig, readJson, validateConfig, writeJson } from './state.mjs';
@@ -13,6 +14,8 @@ const USAGE = [
   '  status                 顯示用量、分段、資料來源與狀態（預設）',
   '  on | off               開關守衛',
   '  set <key> <value>      修改設定，例如 set thresholds.stop 95',
+  '  snooze <分鐘|clear>    暫時不詢問（到 99% 仍會問），或清除所有 snooze',
+  '  resume                 解除「已停止」狀態',
   '  test-dialog            用假資料跳出一次停止對話框，回報選擇與耗時',
 ].join('\n');
 
@@ -56,8 +59,63 @@ async function status(dir, env) {
   const pollFailure = describePollFailure(poll, nowMs / 1000);
   if (!fake && pollFailure) lines.push(`- 輪詢：${pollFailure}`);
   if (!assessment.available) lines.push(`- 不可用原因：${assessment.reason}`);
+  lines.push(`- snooze：${describeSnooze(dir, nowMs)}`);
+  lines.push(`- 已停止：${describeStop(dir, nowMs)}`);
   if (errors.length) lines.push(`- 設定錯誤（暫用預設值）：${errors.join('；')}`);
   return ok(lines.join('\n'));
+}
+
+const clock = (epochSeconds) => {
+  const d = new Date(epochSeconds * 1000);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+function describeSnooze(dir, nowMs) {
+  const snoozes = readJson(join(dir, 'snooze.json'), {}) ?? {};
+  const parts = [];
+  if (snoozes.manual && snoozes.manual.until * 1000 > nowMs) parts.push(`手動，到 ${clock(snoozes.manual.until)}`);
+  for (const [name, entry] of Object.entries(snoozes)) {
+    if (name === 'manual' || !entry || (entry.resets_at && entry.resets_at * 1000 <= nowMs)) continue;
+    parts.push(`${WINDOW_LABELS[name]} ${entry.until_reset ? '到重置' : `到 ${Math.round(entry.limit_pct)}%`}`);
+  }
+  return parts.length ? `${parts.join('；')}（99% 時仍會詢問）` : '無';
+}
+
+function describeStop(dir, nowMs) {
+  const stop = activeStop(dir, nowMs);
+  if (!stop) return '否';
+  const why = STOP_REASONS[stop.reason] ?? '已停止';
+  const progress = [stop.committed && '已 commit', stop.resume_written && `已更新 ${loadConfig(dir).config.resume_file}`].filter(Boolean);
+  return [
+    `是（${WINDOW_LABELS[stop.window]} ${Math.round(stop.pct)}%，${why}），已擋下 ${stop.denials ?? 0} 次`,
+    progress.length ? `；收尾進度：${progress.join('、')}` : '',
+    '；重置或執行 /usage-sentinel resume 後解除',
+  ].join('');
+}
+
+function resume(dir) {
+  if (!activeStop(dir, Date.now())) return ok('目前沒有停止，不需要解除。');
+  rmSync(join(dir, 'stopped.json'), { force: true });
+  return ok('已解除停止狀態。之後達到停止門檻時會再詢問。');
+}
+
+const MAX_SNOOZE_MINUTES = 1440;
+
+function snooze(dir, arg) {
+  const path = join(dir, 'snooze.json');
+  if (arg === 'clear') {
+    rmSync(path, { force: true });
+    return ok('已清除所有 snooze。');
+  }
+  const minutes = Number(arg);
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_SNOOZE_MINUTES) {
+    return fail(`用法：/usage-sentinel snooze <1–${MAX_SNOOZE_MINUTES} 分鐘|clear>`);
+  }
+  const until = Math.floor(Date.now() / 1000) + minutes * 60;
+  const snoozes = readJson(path, {}) ?? {};
+  mkdirSync(dir, { recursive: true });
+  if (!writeJson(path, { ...snoozes, manual: { until } })) return fail('寫入 snooze.json 失敗，請稍後再試。');
+  return ok(`${minutes} 分鐘內（到 ${clock(until)}）達到停止門檻不再詢問；到 99% 時仍會詢問。`);
 }
 
 function parseValue(raw) {
@@ -127,6 +185,10 @@ export async function runCli(args, { env = process.env, dialog = showDialog } = 
       return setConfig(dir, rest[0], parseValue(rest[1]));
     case 'test-dialog':
       return testDialog(dir, dialog);
+    case 'resume':
+      return resume(dir);
+    case 'snooze':
+      return rest.length === 1 ? snooze(dir, rest[0]) : fail(USAGE);
     default:
       return fail(USAGE);
   }

@@ -3,5 +3,6 @@ import { shouldRun } from './gate.mjs';
 
 if (shouldRun()) {
   const { runHook } = await import('./hook-runner.mjs');
-  await runHook('PostToolUse', () => undefined);
+  const { handlePostToolUse } = await import('./handlers/post-tool-use.mjs');
+  await runHook('PostToolUse', handlePostToolUse);
 }

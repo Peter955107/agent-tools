@@ -19,7 +19,7 @@
 ## 第三階段：停止與詢問
 - [x] 任務 7：dialog.mjs（Windows WinForms）與 `test-dialog`（S）
 - [x] 任務 8：觸發停止、prompt.lock、decision.json、繼續（snooze）或停止、events.log（M）
-- [ ] 任務 9：已停止狀態、收尾模式、允許清單、`resume`／`snooze` 指令（M）
+- [x] 任務 9：已停止狀態、收尾模式、允許清單、`resume`／`snooze` 指令（M）
 - [ ] 任務 10：ask 備援、PostToolUse 核准偵測、無人值守時直接停止（S）
 - [ ] 任務 11：自我保護（狀態資料夾、credentials、uninstall 輸出 ask）（S）
 - [ ] **檢查點 3**：驗收 1–10、15、16 通過
@@ -36,4 +36,4 @@
 - [x] 1. 是否接受測試用的 `USAGE_SENTINEL_ENDPOINT`（只在設了 `USAGE_SENTINEL_DIR` 時生效）→ 接受，已實作（任務 4）
 - [x] 2. 本 repo 是否兼作市集，以及市集名稱 → 是，市集名稱 `usage-sentinel`
 - [ ] 3. macOS／Linux 對話框是否納入 v1
-- [ ] 4. 「收尾已完成」的判定方式
+- [x] 4. 「收尾已完成」的判定方式

@@ -1,6 +1,7 @@
 // 停止與詢問（FR-4）：snooze、已停止狀態、決策鎖、詢問並記錄。
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { isAllowedDuringStop, isSuccessfulCommit, wroteResumeFile } from './allowlist.mjs';
 import { buildStopDialog } from './dialog.mjs';
 import { acquireLock, readJson, releaseLock, writeJson } from './state.mjs';
 import { sameCycle } from './usage.mjs';
@@ -27,10 +28,17 @@ export function isSnoozeValid(entry, win) {
   return entry.until_reset || win.pct < entry.limit_pct;
 }
 
+// /usage-sentinel snooze <分鐘> 設定的手動 snooze，套用到所有視窗；99% 規則仍優先。
+function isManualSnoozeValid(manual, win, nowMs) {
+  return Boolean(manual) && manual.until * 1000 > nowMs && win.pct < FORCE_PCT;
+}
+
 // 需要詢問的視窗；百分比高的先問。不需要詢問時回傳 null。
-export function promptTarget(result, snoozes) {
+export function promptTarget(result, snoozes, nowMs = Date.now()) {
   const candidates = result.windows.filter((w) => w.tier === 'stop' || w.pct >= FORCE_PCT).sort((a, b) => b.pct - a.pct);
-  return candidates.find((w) => !isSnoozeValid(snoozes?.[w.window], w)) ?? null;
+  return (
+    candidates.find((w) => !isManualSnoozeValid(snoozes?.manual, w, nowMs) && !isSnoozeValid(snoozes?.[w.window], w)) ?? null
+  );
 }
 
 // 已停止狀態持續到觸發視窗重置，或使用者執行 resume（FR-4.5）。
@@ -185,7 +193,7 @@ export async function resolveStop(ctx) {
   return { kind: 'stopped', stop: writeStop(dir, { target, reason: 'wait_timeout', input, now: Math.floor(Date.now() / 1000) }) };
 }
 
-const STOP_REASONS = {
+export const STOP_REASONS = {
   user: '使用者選擇停止',
   timeout: '詢問逾時，自動停止',
   dismissed: '使用者關閉詢問視窗，視為停止',
@@ -194,7 +202,36 @@ const STOP_REASONS = {
   wait_timeout: '等待決策逾時，自動停止',
 };
 
-export function denyReason(stop, config) {
+function denyReason(stop, config) {
   const why = STOP_REASONS[stop.reason] ?? '已停止';
   return `usage-sentinel：用量 ${Math.round(stop.pct)}%，${why}。只允許 git add／git commit 與編輯 ${config.resume_file}，完成後結束回覆`;
+}
+
+function stopReason(stop) {
+  const why = stop.reason === 'user' ? '由使用者選擇停止' : STOP_REASONS[stop.reason] ?? '已停止';
+  return `usage-sentinel：已達 ${Math.round(stop.pct)}% 用量，${why}`;
+}
+
+// 收尾模式（FR-4.6）：允許清單內的呼叫不輸出決策；其他呼叫 deny，
+// 擋到第 stop_grace_denials 次或收尾已完成時，再加上 continue:false 結束回合。
+export function stopModeResponse(input, stop, { dir, config }) {
+  if (isAllowedDuringStop(input, config)) return undefined;
+  const denials = (stop.denials ?? 0) + 1;
+  writeJson(join(dir, 'stopped.json'), { ...stop, denials });
+  const finished = denials >= config.stop_grace_denials || (stop.committed && stop.resume_written);
+  const output = {
+    hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: denyReason(stop, config) },
+  };
+  // 單獨的 continue:false 不會擋下當次呼叫，必須搭配 deny（A11'）。
+  return finished ? { ...output, continue: false, stopReason: stopReason(stop) } : output;
+}
+
+// PostToolUse：記錄收尾進度（commit 成功、resume_file 已寫入）。
+export function recordWindDownProgress(input, { dir, config }) {
+  const stop = activeStop(dir, Date.now());
+  if (!stop) return;
+  const committed = stop.committed || isSuccessfulCommit(input);
+  const resumeWritten = stop.resume_written || wroteResumeFile(input, config);
+  if (committed === Boolean(stop.committed) && resumeWritten === Boolean(stop.resume_written)) return;
+  writeJson(join(dir, 'stopped.json'), { ...stop, ...(committed && { committed }), ...(resumeWritten && { resume_written: resumeWritten }) });
 }
