@@ -12,6 +12,8 @@
 - [x] 任務 4：usage 端點輪詢，含 poll.lock、429／401／逾時／格式錯誤處理，搭配假 HTTP server 測試（M）
 - [x] 任務 5：來源合併、新鮮度、七種不可用原因、UserPromptSubmit 注入（S–M）
 - [x] 任務 6：`/usage-sentinel status | on | off | set`（S）
+- [x] 修正：本工具的 slash command 用掉了 warn 提醒的注入機會（v0.1.1）
+- [x] 規格變更：注入時以 `systemMessage` 顯示一行給使用者（v0.1.2）
 - [ ] **檢查點 2**：status 顯示真實數字；429 時不阻擋（驗收 8）
 
 ## 第三階段：停止與詢問
@@ -31,7 +33,7 @@
 - [ ] **檢查點 4**：驗收 1–21 全部通過，人工審閱後才算完成
 
 ## 開始前需要你回覆的待決問題
-- [ ] 1. 是否接受測試用的 `USAGE_SENTINEL_ENDPOINT`（只在設了 `USAGE_SENTINEL_DIR` 時生效）
-- [ ] 2. 本 repo 是否兼作市集，以及市集名稱
+- [x] 1. 是否接受測試用的 `USAGE_SENTINEL_ENDPOINT`（只在設了 `USAGE_SENTINEL_DIR` 時生效）→ 接受，已實作（任務 4）
+- [x] 2. 本 repo 是否兼作市集，以及市集名稱 → 是，市集名稱 `usage-sentinel`
 - [ ] 3. macOS／Linux 對話框是否納入 v1
 - [ ] 4. 「收尾已完成」的判定方式
