@@ -18,7 +18,7 @@
 
 ## 第三階段：停止與詢問
 - [x] 任務 7：dialog.mjs（Windows WinForms）與 `test-dialog`（S）
-- [ ] 任務 8：觸發停止、prompt.lock、decision.json、繼續（snooze）或停止、events.log（M）
+- [x] 任務 8：觸發停止、prompt.lock、decision.json、繼續（snooze）或停止、events.log（M）
 - [ ] 任務 9：已停止狀態、收尾模式、允許清單、`resume`／`snooze` 指令（M）
 - [ ] 任務 10：ask 備援、PostToolUse 核准偵測、無人值守時直接停止（S）
 - [ ] 任務 11：自我保護（狀態資料夾、credentials、uninstall 輸出 ask）（S）

@@ -50,7 +50,7 @@ export function readFakeUsage(dir, nowMs) {
 }
 
 // 端點每次回傳的重置時間小數秒都不同（.833、.380），差距在 60 秒內就視為同一週期。
-function sameCycle(a, b) {
+export function sameCycle(a, b) {
   if (a.resets_at === null || b.resets_at === null) return a.resets_at === b.resets_at;
   return Math.abs(a.resets_at - b.resets_at) < 60;
 }

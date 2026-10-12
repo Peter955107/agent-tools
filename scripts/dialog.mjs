@@ -111,6 +111,17 @@ export function showDialog(spec, { platform = process.platform, launch, onSpawn 
   });
 }
 
+// 測試用替身：USAGE_SENTINEL_DIALOG_STUB=「選擇[:延遲毫秒]」，只在設了 USAGE_SENTINEL_DIR 時生效。
+export function dialogFor(env) {
+  const stub = env.USAGE_SENTINEL_DIR && env.USAGE_SENTINEL_DIALOG_STUB;
+  if (!stub) return showDialog;
+  const [choice, delay = '0'] = stub.split(':');
+  return async () => {
+    await new Promise((resolve) => setTimeout(resolve, Number(delay)));
+    return { choice, elapsedMs: Number(delay) };
+  };
+}
+
 const WINDOW_LABELS = { five_hour: '5 小時', seven_day: '7 天' };
 
 export function buildStopDialog({ trigger, project, sessionId, nowMs, timeoutSeconds, fake = false }) {
