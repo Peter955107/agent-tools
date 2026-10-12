@@ -61,7 +61,11 @@ export function validateConfig(c) {
   const n = c.notify ?? {};
   check(typeof n.desktop === 'boolean', 'notify.desktop 必須是 true 或 false');
   check(n.webhook_url === null || (typeof n.webhook_url === 'string' && /^https?:\/\//.test(n.webhook_url)), 'notify.webhook_url 必須是 null 或 http(s) URL');
-  check(c.chain_statusline === null || typeof c.chain_statusline === 'string', 'chain_statusline 必須是 null 或字串');
+  const chain = c.chain_statusline;
+  check(
+    chain === null || typeof chain === 'string' || (typeof chain === 'object' && !Array.isArray(chain) && typeof chain.command === 'string'),
+    'chain_statusline 必須是 null、指令字串，或含 command 的 statusLine 物件',
+  );
 
   return errors;
 }

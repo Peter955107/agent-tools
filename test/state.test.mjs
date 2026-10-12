@@ -66,6 +66,13 @@ describe('validateConfig', () => {
     assert.equal(validateConfig(withConfig({ plan_files: 'plan.md' })).length, 1);
   });
 
+  test('chain_statusline 接受 null、指令字串，或原本的 statusLine 物件', () => {
+    assert.deepEqual(validateConfig(withConfig({ chain_statusline: 'bash -c x' })), []);
+    assert.deepEqual(validateConfig(withConfig({ chain_statusline: { type: 'command', command: 'bash -c x', padding: 0 } })), []);
+    assert.equal(validateConfig(withConfig({ chain_statusline: { type: 'command' } })).length, 1);
+    assert.equal(validateConfig(withConfig({ chain_statusline: 5 })).length, 1);
+  });
+
   test('webhook_url 只接受 null 或 http(s) URL', () => {
     assert.equal(validateConfig(withConfig({ notify: { desktop: true, webhook_url: 'ftp://x' } })).length, 1);
     assert.deepEqual(validateConfig(withConfig({ notify: { desktop: true, webhook_url: 'https://ntfy.sh/x' } })), []);

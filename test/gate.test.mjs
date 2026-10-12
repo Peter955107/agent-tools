@@ -1,8 +1,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { shouldRun, stateDir } from '../scripts/gate.mjs';
+import { marketplaceFromRoot } from '../scripts/handlers/session-start.mjs';
 import { ROOT, runHook, tempDir } from '../test-support/helpers.mjs';
 
 describe('gate.stateDir', () => {
@@ -103,11 +104,58 @@ describe('session-start.mjs', () => {
     assert.equal(existsSync(dir), false);
   });
 
+  test('把 statusline.mjs 複製到 bin/，並寫入 manifest.json', () => {
+    const dir = join(tempDir(), 'usage-sentinel');
+    runHook('session-start.mjs', { input: { source: 'startup' }, env: { USAGE_SENTINEL_DIR: dir } });
+    assert.equal(readFileSync(join(dir, 'bin', 'statusline.mjs'), 'utf8'), readFileSync(join(ROOT, 'scripts', 'statusline.mjs'), 'utf8'));
+    const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8'));
+    const pluginVersion = JSON.parse(readFileSync(join(ROOT, '.claude-plugin', 'plugin.json'), 'utf8')).version;
+    assert.equal(manifest.tool, 'usage-sentinel');
+    assert.equal(manifest.plugin_version, pluginVersion);
+    assert.equal(manifest.state_dir, dir);
+    assert.equal(manifest.statusline.installed, false);
+  });
+
+  test('plugin 版本變更時覆蓋 bin/ 的檔案', () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, 'bin'));
+    writeFileSync(join(dir, 'bin', 'statusline.mjs'), 'old');
+    writeFileSync(join(dir, 'manifest.json'), JSON.stringify({ tool: 'usage-sentinel', plugin_version: '0.0.1', statusline: { installed: true, backup: 'b' } }));
+    runHook('session-start.mjs', { input: { source: 'startup' }, env: { USAGE_SENTINEL_DIR: dir } });
+    assert.notEqual(readFileSync(join(dir, 'bin', 'statusline.mjs'), 'utf8'), 'old');
+    const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8'));
+    assert.deepEqual(manifest.statusline, { installed: true, backup: 'b' }, '保留 statusLine 的安裝紀錄');
+  });
+
+  test('刪除超過 8 天的注入紀錄', () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, 'injected'));
+    const oldMarker = join(dir, 'injected', 'old-session.warn-five_hour-1');
+    const newMarker = join(dir, 'injected', 'new-session.warn-five_hour-1');
+    writeFileSync(oldMarker, '');
+    writeFileSync(newMarker, '');
+    const old = new Date(Date.now() - 9 * 86400_000);
+    utimesSync(oldMarker, old, old);
+    runHook('session-start.mjs', { input: { source: 'startup' }, env: { USAGE_SENTINEL_DIR: dir } });
+    assert.equal(existsSync(oldMarker), false);
+    assert.equal(existsSync(newMarker), true);
+  });
+
   test('stdin 不是合法 JSON 時仍 exit 0', () => {
     const dir = tempDir();
     mkdirSync(dir, { recursive: true });
     const result = runHook('session-start.mjs', { input: 'not json', env: { USAGE_SENTINEL_DIR: dir } });
     assert.equal(result.code, 0, result.stderr);
+  });
+});
+
+describe('marketplaceFromRoot', () => {
+  test('從 plugin cache 路徑取出市集名稱', () => {
+    assert.equal(marketplaceFromRoot('C:\\Users\\u\\.claude\\plugins\\cache\\my-market\\usage-sentinel\\0.3.3'), 'my-market');
+  });
+
+  test('從本機資料夾執行時為 null', () => {
+    assert.equal(marketplaceFromRoot('C:\\Users\\u\\Documents\\usage-sentinel'), null);
   });
 });
 
