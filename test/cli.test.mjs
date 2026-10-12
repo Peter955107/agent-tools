@@ -28,6 +28,21 @@ describe('status', () => {
     assert.match(text, /資料來源：fake/);
   });
 
+  // 回歸：fake 的 resets_at 寫成已過去的時間時，status 顯示「86%（0 分後重置）· 分段 normal」，
+  // 看不出視窗已被視為 0%，實測時以為守衛沒反應。
+  test('重置時間已過的視窗標示「已重置，視為 0%」', async () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'fake-usage.json'), JSON.stringify({ five_hour: { utilization: 86, resets_at: '2026-10-12T05:00:00+08:00' } }));
+    const { text } = await cli(dir, 'status');
+    assert.match(text, /5 小時：已重置（資料為 86%，但重置時間 .+ 已過，視為 0%） · 分段 normal/);
+  });
+
+  test('fake 資料的所有視窗都已重置時提醒檢查 resets_at', async () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'fake-usage.json'), JSON.stringify({ five_hour: { utilization: 93, resets_at: 1000 } }));
+    assert.match((await cli(dir, 'status')).text, /⚠ fake-usage\.json 的 resets_at 都已過去/);
+  });
+
   test('資料不可用時顯示原因', async () => {
     const { text } = await cli(tempDir(), 'status');
     assert.match(text, /不可用原因：憑證無效/);

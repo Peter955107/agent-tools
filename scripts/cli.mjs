@@ -49,10 +49,22 @@ async function status(dir, env) {
 
   if (snapshot) {
     const result = computeTier(snapshot, config, nowMs);
+    let resetCount = 0;
     for (const win of result.windows) {
-      const reset = win.resets_at ? `（${formatDuration(win.resets_at - nowMs / 1000)}後重置）` : '';
       const tier = assessment.available ? `分段 ${win.tier}` : '資料不可用，不據此判斷';
+      const isReset = win.resets_at && win.resets_at * 1000 <= nowMs;
+      if (isReset) {
+        resetCount += 1;
+        const raw = Math.round(snapshot.windows[win.window].pct);
+        const when = new Date(win.resets_at * 1000).toLocaleString('zh-TW', { hour12: false });
+        lines.push(`- ${WINDOW_LABELS[win.window]}：已重置（資料為 ${raw}%，但重置時間 ${when} 已過，視為 0%） · ${tier}`);
+        continue;
+      }
+      const reset = win.resets_at ? `（${formatDuration(win.resets_at - nowMs / 1000)}後重置）` : '';
       lines.push(`- ${WINDOW_LABELS[win.window]}：${Math.round(win.pct)}%${reset} · ${tier}`);
+    }
+    if (fake && resetCount > 0 && resetCount === result.windows.length) {
+      lines.push('- ⚠ fake-usage.json 的 resets_at 都已過去，所有視窗視為 0%，不會觸發任何提醒或停止。請改成未來的時間。');
     }
     lines.push(`- 資料來源：${snapshot.source}，${Math.floor((nowMs / 1000 - snapshot.observed_at) / 60)} 分鐘前`);
   }
