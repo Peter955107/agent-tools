@@ -22,10 +22,10 @@
 - [x] 任務 9：已停止狀態、收尾模式、允許清單、`resume`／`snooze` 指令（M）
 - [x] 任務 10：ask 備援、PostToolUse 核准偵測、無人值守時直接停止（S）
 - [x] 任務 11：自我保護（狀態資料夾、credentials、uninstall 輸出 ask）（S）
-- [ ] **檢查點 3**：驗收 1–10、15、16 通過
+- [x] **檢查點 3**：驗收 1–10、15、16 通過
 
 ## 第四階段：周邊與移除
-- [ ] 任務 12：桌面 toast 與 webhook 通知（S）
+- [x] 任務 12：桌面 toast 與 webhook 通知（S）
 - [ ] 任務 13：SessionStart 複製 bin/、寫 manifest；statusline.mjs 串接；install-statusline.mjs（M）
 - [ ] 任務 14：uninstall.mjs 本機部分（statusLine 還原、狀態資料夾、冪等、dry-run／yes／purge）（M）
 - [ ] 任務 15：uninstall.mjs 的 Claude Code 部分（執行中程序預檢、各範圍 plugin、市集、cache、設定差異、往返測試）（M）
