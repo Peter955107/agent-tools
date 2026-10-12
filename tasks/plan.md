@@ -251,6 +251,7 @@ gate.mjs（停用開關、路徑）
 - [ ] 在任何分段（包括 normal）都擋下：
   - Write／Edit 寫入狀態資料夾或 `.credentials.json`
   - Bash／PowerShell 指令字串中出現這兩個路徑
+- [ ] Bash／PowerShell 直接執行 `cli.mjs`、`install-statusline.mjs` 也要擋下。slash command 已設 `disable-model-invocation: true`，agent 只剩這條路能改設定
 - [ ] 路徑比對要正規化：`~`、`$HOME`、`%USERPROFILE%`、正反斜線、大小寫（Windows）
 - [ ] 執行 `uninstall.mjs` 或 `/usage-sentinel uninstall` 時輸出 `ask`，不輸出 `deny`
 

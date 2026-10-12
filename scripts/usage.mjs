@@ -69,7 +69,7 @@ export function mergeWindows(existing = {}, incoming = {}) {
   return merged;
 }
 
-function describePollFailure(poll, now) {
+export function describePollFailure(poll, now) {
   const status = poll?.status;
   switch (status?.code) {
     case 'token_expired':
