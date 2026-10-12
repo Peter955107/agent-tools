@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runCli } from '../scripts/cli.mjs';
 import { ROOT, isolatedEnv, runHook, tempDir } from '../test-support/helpers.mjs';
@@ -196,6 +196,34 @@ describe('test-dialog', () => {
     await run(dir, async () => ({ choice: 'continue', elapsedMs: 1 }));
     assert.equal(existsSync(join(dir, 'decision.json')), false);
     assert.equal(existsSync(join(dir, 'snooze.json')), false);
+  });
+});
+
+describe('uninstall', () => {
+  const run = (dir, ...args) => runCli(['uninstall', ...args], { env: isolatedEnv({ USAGE_SENTINEL_DIR: dir, CLAUDE_CONFIG_DIR: tempDir() }) });
+
+  test('沒有參數時只列出清單（--dry-run），並提示加 --yes', async () => {
+    const dir = withFake(10);
+    const { code, text } = await run(dir, '--skip-claude');
+    assert.equal(code, 0, text);
+    assert.match(text, /將移除/);
+    assert.match(text, /--yes/);
+    assert.ok(existsSync(dir));
+  });
+
+  test('--yes 時執行移除', async () => {
+    const dir = withFake(10);
+    const { code, text } = await run(dir, '--yes', '--skip-claude');
+    assert.equal(code, 0, text);
+    assert.equal(existsSync(dir), false);
+  });
+
+  test('優先使用 bin/ 裡的副本（plugin 本體壞掉時也能移除）', async () => {
+    const dir = withFake(10);
+    mkdirSync(join(dir, 'bin'));
+    writeFileSync(join(dir, 'bin', 'uninstall.mjs'), "process.stdout.write('from-bin ' + process.argv.slice(2).join(' '))");
+    const { text } = await run(dir, '--yes');
+    assert.match(text, /from-bin --yes/);
   });
 });
 

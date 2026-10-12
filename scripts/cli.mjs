@@ -1,7 +1,8 @@
 // /usage-sentinel slash command 的後端（FR-6）。只由使用者執行；agent 的呼叫由 FR-4.8 擋下。
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
-import { basename, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { basename, dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { STOP_REASONS, activeStop } from './decision.mjs';
 import { buildStopDialog, showDialog } from './dialog.mjs';
 import { stateDir } from './gate.mjs';
@@ -19,6 +20,7 @@ const USAGE = [
   '  resume                 解除「已停止」狀態',
   '  test-dialog            用假資料跳出一次停止對話框，回報選擇與耗時',
   '  install-statusline     （選配，只有終端機 CLI 有效）把 statusLine 指向本工具，原本的接在後面',
+  '  uninstall [--yes]      一鍵移除；不加 --yes 只列清單（建議在 Claude Code 外的終端機執行）',
 ].join('\n');
 
 const WINDOW_LABELS = { five_hour: '5 小時', seven_day: '7 天' };
@@ -185,6 +187,23 @@ async function testDialog(dir, dialog) {
   return ok(`test-dialog：${DIALOG_OUTCOMES[choice] ?? choice}，耗時 ${(elapsedMs / 1000).toFixed(1)} 秒${why}`);
 }
 
+// 在 Claude Code 裡執行移除（FR-8.2 方式 2）。slash command 沒有鍵盤輸入，
+// 所以沒指定 --yes 時只列清單；優先用 bin/ 的副本，plugin 本體壞掉時也能移除。
+function uninstall(dir, env, flags) {
+  const binCopy = join(dir, 'bin', 'uninstall.mjs');
+  const script = existsSync(binCopy) ? binCopy : join(dirname(fileURLToPath(import.meta.url)), 'uninstall.mjs');
+  const confirmed = flags.includes('--yes') || flags.includes('--dry-run');
+  const result = spawnSync(process.execPath, [script, ...(confirmed ? flags : ['--dry-run', ...flags])], {
+    env,
+    encoding: 'utf8',
+    timeout: 300000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trimEnd();
+  const hint = confirmed ? '' : '\n\n確認清單後，執行 /usage-sentinel:usage-sentinel uninstall --yes 才會真的移除（建議改在 Claude Code 外的終端機執行，見 README）。';
+  return { code: result.status ?? 1, text: output + hint };
+}
+
 export async function runCli(args, { env = process.env, dialog = showDialog } = {}) {
   const dir = stateDir(env);
   const [command = 'status', ...rest] = args;
@@ -204,6 +223,8 @@ export async function runCli(args, { env = process.env, dialog = showDialog } = 
       return resume(dir);
     case 'install-statusline':
       return installStatusline({ env });
+    case 'uninstall':
+      return uninstall(dir, env, rest);
     case 'snooze':
       return rest.length === 1 ? snooze(dir, rest[0]) : fail(USAGE);
     default:
