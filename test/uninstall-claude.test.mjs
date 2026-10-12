@@ -85,6 +85,26 @@ describe('步驟 0：執行中的 Claude Code session（驗收 17）', () => {
   });
 });
 
+describe('步驟 10：設定差異（驗收 20）', () => {
+  test('列出不是本工具造成的變動，並附上備份路徑', () => {
+    const ctx = installed();
+    const state = JSON.parse(readFileSync(ctx.statePath, 'utf8'));
+    writeFileSync(ctx.statePath, JSON.stringify({ ...state, normalizeModel: true }));
+    const { out } = uninstall(ctx);
+    assert.match(out, /不是本工具造成的設定變動/);
+    assert.match(out, /model："opus" → "opus\[1m\]"/);
+    assert.match(out, /backups[\\/]usage-sentinel[\\/].+-uninstall/);
+  });
+
+  test('只有本工具預期的變動時，說明沒有其他變動', () => {
+    const ctx = installed();
+    const { out } = uninstall(ctx);
+    assert.match(out, /settings\.json 沒有其他變動/);
+    assert.doesNotMatch(out, /enabledPlugins\.usage-sentinel@usage-sentinel：/);
+    assert.doesNotMatch(out, /extraKnownMarketplaces\.usage-sentinel：/);
+  });
+});
+
 describe('步驟 5–7：plugin、市集、cache', () => {
   test('完整移除：uninstall、移除市集宣告、刪除 cache，自我檢查全部 ✅（驗收 12）', () => {
     const ctx = installed();

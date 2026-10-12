@@ -29,6 +29,7 @@
 | 「收尾已完成」的判定：在已停止狀態下，PostToolUse 觀察到允許清單內的 `git commit` 成功，**且**觀察到對 `resume_file` 的 Write／Edit，就記錄在 `stopped.json` 裡 | FR-4.6 需要這個判定；hook 本身無法直接得知 commit 是否成功 |
 | **規格變更（使用者同意）**：注入時除了 `additionalContext`（給 Claude），也輸出 `systemMessage` 顯示一行給使用者 | `additionalContext` 使用者看不到，實測時無法察覺提醒是否送達 |
 | 本工具自己的 slash command（`/usage-sentinel…`）觸發 UserPromptSubmit 時不注入 | 實測發現 status 指令會用掉 warn 的唯一一次注入機會 |
+| 驗收 21 的例外加上 `plugins/installed_plugins.json`、`plugins/known_marketplaces.json` | 實測（真 CLI 往返）：這是 Claude Code 第一次安裝任何 plugin 時建立的登記檔，移除後保留給之後的安裝使用；測試另外確認內容不含 usage-sentinel |
 | 時間計算一律用 epoch 秒；ISO 時間（含微秒）在正規化階段就轉換 | FR-1 正規化 |
 
 ## 相依關係圖

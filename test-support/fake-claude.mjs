@@ -37,6 +37,8 @@ if (group === 'plugin' && action === 'list') {
   const settings = readJson(file, null);
   if (settings?.enabledPlugins) {
     delete settings.enabledPlugins[id];
+    // E9：Claude Code 寫入設定時會把 model 正規化（opus → opus[1m]）。
+    if (state.normalizeModel && settings.model === 'opus') settings.model = 'opus[1m]';
     writeFileSync(file, JSON.stringify(settings, null, 2));
   }
   if (!state.plugins.some((p) => p.id === id)) {

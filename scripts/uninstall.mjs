@@ -153,6 +153,33 @@ const ourMarkets = [
 ];
 const cacheDirOf = (market) => join(claudeDir, 'plugins', 'cache', market, 'usage-sentinel');
 const sessionsRunning = Boolean(sessions?.length);
+// 移除前的 settings.json，用來比對哪些變動不是本工具造成的（FR-8.4 步驟 10）。
+const settingsBefore = readJson(settingsPath, null);
+
+function flatten(value, prefix = '', out = {}) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    for (const key of Object.keys(value)) flatten(value[key], prefix ? `${prefix}.${key}` : key, out);
+  } else {
+    out[prefix] = JSON.stringify(value);
+  }
+  return out;
+}
+
+// 本工具本來就會動到的鍵：statusLine、本 plugin 的 enabledPlugins 項目、專屬市集宣告。
+const isExpectedChange = (path) =>
+  path === 'statusLine' ||
+  path.startsWith('statusLine.') ||
+  /^enabledPlugins\.usage-sentinel@/.test(path) ||
+  path === 'extraKnownMarketplaces.usage-sentinel' ||
+  path.startsWith('extraKnownMarketplaces.usage-sentinel.');
+
+function unexpectedSettingsChanges() {
+  const before = flatten(settingsBefore ?? {});
+  const after = flatten(readJson(settingsPath, {}) ?? {});
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .filter((path) => before[path] !== after[path] && !isExpectedChange(path))
+    .map((path) => `${path}：${before[path] ?? '（無）'} → ${after[path] ?? '（已刪除）'}`);
+}
 
 function dialogPid() {
   const pid = Number.parseInt(readJson(dialogPidPath, null) ?? (exists(dialogPidPath) ? readFileSync(dialogPidPath, 'utf8') : ''), 10);
@@ -342,6 +369,18 @@ const steps = [
       return { status: 'done', message: `已刪除備份資料夾 ${backupsRoot}` };
     },
   },
+  {
+    label: '比對設定差異',
+    plan: () => null,
+    run: ({ purgeBackups }) => {
+      if (!settingsBefore) return { status: 'absent', message: 'settings.json 不存在，略過差異比對' };
+      const changes = unexpectedSettingsChanges();
+      if (!changes.length) return { status: 'done', message: 'settings.json 沒有其他變動' };
+      // Claude Code 寫入設定時可能正規化或刪掉不認得的值（E9、#84867）。
+      const backup = purgeBackups ? '（備份已依 --purge 刪除）' : `備份：${join(backupDir, 'settings.json')}`;
+      return { status: 'note', message: `不是本工具造成的設定變動，${backup}\n  - ${changes.join('\n  - ')}` };
+    },
+  },
 ];
 
 // ---------- 殘留自我檢查（FR-8.5） ----------
@@ -486,7 +525,7 @@ for (const step of steps) {
   } catch (error) {
     result = { status: 'warn', message: `${step.label}失敗：${error.code || error.message}` };
   }
-  const mark = { done: '✓', absent: '·', warn: '⚠️' }[result.status];
+  const mark = { done: '✓', absent: '·', warn: '⚠️', note: 'ℹ️' }[result.status];
   say(`${mark} ${result.message}${result.status === 'absent' && !/已不存在/.test(result.message) ? '（已不存在）' : ''}`);
 }
 
