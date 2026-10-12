@@ -34,6 +34,19 @@ describe('prompt.mjs（UserPromptSubmit）', () => {
     assert.equal(call('guard.mjs', dir), null);
   });
 
+  // 回歸：status 指令的 prompt 會觸發 UserPromptSubmit，但 Claude 只會轉述指令輸出，提醒等於白白用掉。
+  for (const prompt of ['/usage-sentinel:usage-sentinel status', '/usage-sentinel status', '  /usage-sentinel:usage-sentinel']) {
+    test(`本工具的 slash command（${prompt.trim()}）不注入，也不佔用注入機會`, () => {
+      const dir = withFake(80);
+      assert.equal(call('prompt.mjs', dir, { prompt }), null);
+      assert.ok(call('guard.mjs', dir));
+    });
+  }
+
+  test('其他以 /usage-sentinel 開頭的字詞仍正常注入', () => {
+    assert.ok(call('prompt.mjs', withFake(80), { prompt: '/usage-sentinel-notes 是什麼？' }));
+  });
+
   test('normal 分段不輸出', () => {
     assert.equal(call('prompt.mjs', withFake(10)), null);
   });
