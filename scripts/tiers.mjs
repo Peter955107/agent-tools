@@ -55,6 +55,13 @@ export function usageLine(result, nowMs) {
   return `usage-sentinel：${result.windows.map((w) => describeWindow(w, nowMs)).join(' · ')}`;
 }
 
+// 以 systemMessage 顯示給使用者的一行；additionalContext 只有 Claude 看得到。
+export function userMessage(result, config, nowMs) {
+  const usage = describeWindow(result.trigger, nowMs);
+  if (result.tier === 'warn') return `⚠ usage-sentinel：${usage}`;
+  return `⚠ usage-sentinel：${usage}，已進入收尾階段，Claude 會 commit 並更新 ${config.resume_file}`;
+}
+
 // warn 只給一行用量；wind-down（以及尚未實作停止前的 stop）附上收尾指示。
 export function injectionText(result, config, nowMs) {
   const line = usageLine(result, nowMs);

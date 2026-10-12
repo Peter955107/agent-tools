@@ -42,6 +42,11 @@ describe('guard.mjs 注入', () => {
     assert.equal(output.continue, undefined);
   });
 
+  test('注入時同時以 systemMessage 顯示一行給使用者', () => {
+    const output = callGuard(setup({ fiveHour: 80 }));
+    assert.match(output.systemMessage, /^⚠ usage-sentinel：5 小時用量 80%/);
+  });
+
   test('同一 session 同一分段只注入一次', () => {
     const dir = setup({ fiveHour: 80 });
     assert.ok(callGuard(dir));

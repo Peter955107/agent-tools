@@ -26,6 +26,7 @@ describe('prompt.mjs（UserPromptSubmit）', () => {
     const output = call('prompt.mjs', withFake(80));
     assert.equal(output.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
     assert.match(output.hookSpecificOutput.additionalContext, /5 小時用量 80%/);
+    assert.match(output.systemMessage, /^⚠ usage-sentinel：5 小時用量 80%/);
   });
 
   test('與 PreToolUse 共用「已注入」紀錄', () => {
@@ -57,6 +58,7 @@ describe('資料不可用時的注入（FR-3）', () => {
     const dir = tempDir(); // 沒有 fake、沒有 credentials
     const first = call('guard.mjs', dir);
     assert.match(first.hookSpecificOutput.additionalContext, /用量資料不可用：憑證無效/);
+    assert.equal(first.systemMessage, 'usage-sentinel：用量資料不可用：憑證無效');
     assert.equal(first.hookSpecificOutput.permissionDecision, undefined);
     assert.equal(call('guard.mjs', dir), null);
     assert.equal(call('prompt.mjs', dir), null);

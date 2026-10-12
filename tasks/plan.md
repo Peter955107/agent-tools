@@ -27,6 +27,8 @@
 | **新增**測試用環境變數 `USAGE_SENTINEL_ENDPOINT`，用來覆寫 usage 端點 URL，只在同時設了 `USAGE_SENTINEL_DIR` 時生效 | 整合測試需要假 HTTP server；限制生效條件，避免正式環境被導到別處而外洩 token（見待決問題 1） |
 | 純邏輯（分段、正規化、合併、snooze、允許清單、自我保護）都寫成無副作用的函式，與 I/O 分開 | 方便單元測試；hook 腳本只負責組裝 |
 | 「收尾已完成」的判定：在已停止狀態下，PostToolUse 觀察到允許清單內的 `git commit` 成功，**且**觀察到對 `resume_file` 的 Write／Edit，就記錄在 `stopped.json` 裡 | FR-4.6 需要這個判定；hook 本身無法直接得知 commit 是否成功 |
+| **規格變更（使用者同意）**：注入時除了 `additionalContext`（給 Claude），也輸出 `systemMessage` 顯示一行給使用者 | `additionalContext` 使用者看不到，實測時無法察覺提醒是否送達 |
+| 本工具自己的 slash command（`/usage-sentinel…`）觸發 UserPromptSubmit 時不注入 | 實測發現 status 指令會用掉 warn 的唯一一次注入機會 |
 | 時間計算一律用 epoch 秒；ISO 時間（含微秒）在正規化階段就轉換 | FR-1 正規化 |
 
 ## 相依關係圖

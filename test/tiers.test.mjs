@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_CONFIG } from '../scripts/state.mjs';
-import { computeTier, effectivePct, formatDuration, injectionText } from '../scripts/tiers.mjs';
+import { computeTier, effectivePct, formatDuration, injectionText, userMessage } from '../scripts/tiers.mjs';
 
 const NOW_MS = 1_800_000_000_000;
 const NOW = NOW_MS / 1000;
@@ -87,6 +87,21 @@ describe('formatDuration', () => {
 
   test('負數或零顯示 0 分', () => {
     assert.equal(formatDuration(-5), '0 分');
+  });
+});
+
+describe('userMessage（顯示給使用者的一行）', () => {
+  test('warn：用量與重置倒數', () => {
+    const result = computeTier(snapshot([['five_hour', 80, 3600]]), config, NOW_MS);
+    assert.equal(userMessage(result, config, NOW_MS), '⚠ usage-sentinel：5 小時用量 80%（1 小時 0 分後重置）');
+  });
+
+  test('wind-down：說明 Claude 會開始收尾，並提到 resume_file', () => {
+    const result = computeTier(snapshot([['five_hour', 86, 3600]]), config, NOW_MS);
+    const text = userMessage(result, { ...config, resume_file: 'NOTES.md' }, NOW_MS);
+    assert.match(text, /^⚠ usage-sentinel：5 小時用量 86%.*已進入收尾階段/);
+    assert.match(text, /NOTES\.md/);
+    assert.equal(text.includes('\n'), false);
   });
 });
 
