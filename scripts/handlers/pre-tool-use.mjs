@@ -1,4 +1,4 @@
-import { activeStop, resolveStop, stopModeResponse } from '../decision.mjs';
+import { activeStop, askResponse, resolveStop, stopModeResponse } from '../decision.mjs';
 import { dialogFor } from '../dialog.mjs';
 import { injectionFor, injectionOutput, usageState } from '../inject.mjs';
 import { loadConfig } from '../state.mjs';
@@ -15,6 +15,7 @@ async function decide(input, { dir, env }, config) {
   if (state.assessment.available) {
     const outcome = await resolveStop({ ...ctx, input, result: state.result, snapshot: state.snapshot, dialog: dialogFor(env) });
     if (outcome?.kind === 'stopped') return stopModeResponse(input, outcome.stop, { dir, config });
+    if (outcome?.kind === 'ask') return askResponse(outcome.pending, Date.now());
   }
 
   const injection = injectionFor(input, ctx, state);

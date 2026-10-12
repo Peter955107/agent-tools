@@ -1,9 +1,10 @@
 // 停止與詢問（FR-4）：snooze、已停止狀態、決策鎖、詢問並記錄。
-import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { isAllowedDuringStop, isSuccessfulCommit, wroteResumeFile } from './allowlist.mjs';
 import { buildStopDialog } from './dialog.mjs';
 import { acquireLock, readJson, releaseLock, writeJson } from './state.mjs';
+import { formatDuration } from './tiers.mjs';
 import { sameCycle } from './usage.mjs';
 
 const FORCE_PCT = 99;
@@ -118,13 +119,43 @@ async function askAndRecord(ctx, target) {
     ({ choice: dialogResult, elapsedMs } = await dialog(spec, { onSpawn }));
   }
 
+  // 對話框不可用：改用權限確認（ask），結果由 PostToolUse 或下一次呼叫判定（FR-4.3 第 2 項）。
+  if (dialogResult === 'unavailable') {
+    const pending = {
+      tool_use_ids: input.tool_use_id ? [input.tool_use_id] : [],
+      session: input.session_id ?? null,
+      window: target.window,
+      pct: target.pct,
+      resets_at: target.resets_at,
+      at: Date.now(),
+      source: snapshot.source,
+      observed_at: snapshot.observed_at,
+    };
+    writeJson(join(dir, 'pending-ask.json'), pending);
+    return { kind: 'ask', pending };
+  }
+
   const choice = dialogResult === 'continue' || dialogResult === 'until_reset' ? dialogResult : 'stop';
   const reason = { dialog: dialogResult === 'stop' ? 'user' : dialogResult, unattended: 'unattended' }[method] ?? 'user';
-  const done = Math.floor(Date.now() / 1000);
+  return recordDecision(dir, config, {
+    target,
+    choice,
+    reason,
+    method,
+    dialogResult,
+    elapsedMs,
+    session: input.session_id ?? null,
+    source: snapshot.source,
+    dataAge: now - snapshot.observed_at,
+  });
+}
 
+// 寫入一次決策：停止寫 stopped.json、繼續寫 snooze.json，並記錄 decision.json 與 events.log（FR-4.5、4.9）。
+function recordDecision(dir, config, { target, choice, reason, method, dialogResult, elapsedMs = 0, session, source, dataAge }) {
+  const done = Math.floor(Date.now() / 1000);
   let outcome;
   if (choice === 'stop') {
-    outcome = { kind: 'stopped', stop: writeStop(dir, { target, reason, input, now: done }) };
+    outcome = { kind: 'stopped', stop: writeStop(dir, { target, reason, input: { session_id: session }, now: done }) };
   } else {
     const snoozes = readJson(join(dir, 'snooze.json'), {}) ?? {};
     snoozes[target.window] = snoozeEntry(choice, target, config, done);
@@ -134,7 +165,7 @@ async function askAndRecord(ctx, target) {
   writeJson(join(dir, 'decision.json'), { choice, window: target.window, pct: target.pct, method, at: done });
   appendEvent(dir, {
     at: new Date().toISOString(),
-    session: input.session_id ?? null,
+    session,
     window: target.window,
     pct: target.pct,
     method,
@@ -142,13 +173,68 @@ async function askAndRecord(ctx, target) {
     choice,
     timed_out: dialogResult === 'timeout',
     elapsed_ms: elapsedMs,
-    source: snapshot.source,
-    data_age_seconds: now - snapshot.observed_at,
+    source,
+    data_age_seconds: dataAge,
   });
   return outcome;
 }
 
-// 達到停止門檻時決定這次呼叫的結果：{ kind: 'continue' } 或 { kind: 'stopped', stop }。
+// ask 送出後，同一批平行呼叫（PreToolUse 會先全部跑完才顯示權限確認）也輸出 ask；
+// 超過這個時間仍沒有核准，就視為使用者拒絕。
+const ASK_BATCH_MS = 5000;
+
+function readPendingAsk(dir) {
+  return readJson(join(dir, 'pending-ask.json'), null);
+}
+
+function pendingTarget(pending) {
+  return { window: pending.window, pct: pending.pct, resets_at: pending.resets_at };
+}
+
+function resolvePendingAsk(dir, config, pending, { choice, dialogResult }) {
+  rmSync(join(dir, 'pending-ask.json'), { force: true });
+  return recordDecision(dir, config, {
+    target: pendingTarget(pending),
+    choice,
+    reason: 'user',
+    method: 'ask',
+    dialogResult,
+    elapsedMs: Date.now() - pending.at,
+    session: pending.session,
+    source: pending.source,
+    dataAge: Math.floor(pending.at / 1000) - pending.observed_at,
+  });
+}
+
+// PostToolUse：被 ask 的工具真的執行了 ＝ 使用者核准 ＝ 繼續。
+export function recordAskApproval(input, { dir, config }) {
+  const pending = readPendingAsk(dir);
+  if (!pending || !input.tool_use_id || !pending.tool_use_ids.includes(input.tool_use_id)) return;
+  resolvePendingAsk(dir, config, pending, { choice: 'continue', dialogResult: 'approved' });
+}
+
+const WINDOW_LABELS = { five_hour: '5 小時', seven_day: '7 天' };
+
+export function askResponse(pending, nowMs) {
+  const reset = pending.resets_at ? `（${formatDuration(pending.resets_at - nowMs / 1000)}後重置）` : '';
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'ask',
+      permissionDecisionReason: `usage-sentinel：${WINDOW_LABELS[pending.window]}用量 ${Math.round(pending.pct)}%${reset}，無法跳出詢問視窗。核准＝繼續工作；拒絕＝停止並收尾。`,
+    },
+  };
+}
+
+// 同一批平行呼叫共用待決的 ask：把這次的 tool_use_id 加進去，核准任何一個都算繼續。
+function joinPendingAsk(dir, pending, input) {
+  if (input.tool_use_id && !pending.tool_use_ids.includes(input.tool_use_id)) {
+    writeJson(join(dir, 'pending-ask.json'), { ...pending, tool_use_ids: [...pending.tool_use_ids, input.tool_use_id] });
+  }
+  return { kind: 'ask', pending };
+}
+
+// 達到停止門檻時決定這次呼叫的結果：{ kind: 'continue' }、{ kind: 'stopped', stop } 或 { kind: 'ask', pending }。
 // 不需要詢問時回傳 null。同一時間全機只會有一個對話框（FR-4.2）。
 export async function resolveStop(ctx) {
   const { dir, config, input, result } = ctx;
@@ -156,6 +242,8 @@ export async function resolveStop(ctx) {
   const currentOutcome = () => {
     const stop = activeStop(dir, Date.now());
     if (stop) return { kind: 'stopped', stop };
+    const pending = readPendingAsk(dir);
+    if (pending && Date.now() - pending.at <= ASK_BATCH_MS) return joinPendingAsk(dir, pending, input);
     const target = promptTarget(result, readJson(join(dir, 'snooze.json'), {}));
     return target ? null : { kind: 'continue' };
   };
@@ -170,6 +258,9 @@ export async function resolveStop(ctx) {
         // 搶到鎖後再確認一次：別人可能剛做完決定。
         const settled = currentOutcome();
         if (settled) return settled;
+        // ask 送出後超過一批的時間仍沒有核准：使用者拒絕了，視為停止。
+        const stalePending = readPendingAsk(dir);
+        if (stalePending) return resolvePendingAsk(dir, config, stalePending, { choice: 'stop', dialogResult: 'denied' });
         return await askAndRecord(ctx, promptTarget(result, readJson(join(dir, 'snooze.json'), {})));
       } finally {
         releaseLock(dir, 'prompt.lock', token);
