@@ -9,7 +9,7 @@
 - [ ] **檢查點 1**：VS Code 實機，fake 80% 看到注入；`DISABLED` 存在時完全靜默
 
 ## 第二階段：真實用量資料
-- [ ] 任務 4：usage 端點輪詢，含 poll.lock、429／401／逾時／格式錯誤處理，搭配假 HTTP server 測試（M）
+- [x] 任務 4：usage 端點輪詢，含 poll.lock、429／401／逾時／格式錯誤處理，搭配假 HTTP server 測試（M）
 - [ ] 任務 5：來源合併、新鮮度、七種不可用原因、UserPromptSubmit 注入（S–M）
 - [ ] 任務 6：`/usage-sentinel status | on | off | set`（S）
 - [ ] **檢查點 2**：status 顯示真實數字；429 時不阻擋（驗收 8）

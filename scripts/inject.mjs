@@ -11,10 +11,10 @@ function injectionKey(result) {
 }
 
 // 回傳這次要注入的文字；不需要注入時回傳 undefined。
-export function pendingInjection(input, { dir, config, nowMs }) {
+export async function pendingInjection(input, { dir, config, env, nowMs }) {
   // subagent 的呼叫不注入（FR-2），也不能佔用主 agent 的注入機會。
   if (input.agent_id) return undefined;
-  const snapshot = getUsage({ dir, config, nowMs });
+  const snapshot = await getUsage({ dir, config, env, nowMs });
   if (!snapshot) return undefined;
   const result = computeTier(snapshot, config, nowMs);
   if (result.tier === 'normal') return undefined;

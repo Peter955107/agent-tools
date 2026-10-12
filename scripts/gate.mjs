@@ -4,8 +4,13 @@ import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+// Claude Code 的設定資料夾；CLAUDE_CONFIG_DIR 可覆寫（隔離測試、驗收 21）。
+export function claudeDir(env = process.env, home = homedir) {
+  return env.CLAUDE_CONFIG_DIR || join(home(), '.claude');
+}
+
 export function stateDir(env = process.env, home = homedir) {
-  return env.USAGE_SENTINEL_DIR || join(home(), '.claude', 'usage-sentinel');
+  return env.USAGE_SENTINEL_DIR || join(claudeDir(env, home), 'usage-sentinel');
 }
 
 function isDirectory(path) {

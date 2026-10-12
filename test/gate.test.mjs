@@ -11,6 +11,10 @@ describe('gate.stateDir', () => {
     assert.equal(dir, join('/home/u', '.claude', 'usage-sentinel'));
   });
 
+  test('跟隨 CLAUDE_CONFIG_DIR', () => {
+    assert.equal(stateDir({ CLAUDE_CONFIG_DIR: '/cfg' }, () => '/home/u'), join('/cfg', 'usage-sentinel'));
+  });
+
   test('USAGE_SENTINEL_DIR 可覆寫狀態資料夾', () => {
     assert.equal(stateDir({ USAGE_SENTINEL_DIR: '/tmp/x' }), '/tmp/x');
   });
