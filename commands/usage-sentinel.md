@@ -1,6 +1,6 @@
 ---
-description: usage-sentinel 用量守衛：status、on、off、set
-argument-hint: status | on | off | set <key> <value>
+description: usage-sentinel 用量守衛：status、on、off、set、test-dialog
+argument-hint: status | on | off | set <key> <value> | test-dialog
 allowed-tools: Bash(node:*)
 disable-model-invocation: true
 ---

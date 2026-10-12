@@ -137,6 +137,48 @@ describe('set', () => {
   });
 });
 
+describe('test-dialog', () => {
+  const run = (dir, dialog) => runCli(['test-dialog'], { env: isolatedEnv({ USAGE_SENTINEL_DIR: dir }), dialog });
+
+  test('用假資料跳出 5 小時視窗的對話框，逾時取自設定，標示 FAKE', async () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'config.json'), JSON.stringify({ prompt_timeout_seconds: 30 }));
+    let spec;
+    await run(dir, async (s) => {
+      spec = s;
+      return { choice: 'stop', elapsedMs: 10 };
+    });
+    assert.match(spec.title, /FAKE/);
+    assert.match(spec.body, /5 小時用量 93%/);
+    assert.deepEqual(spec.buttons.map((b) => b.id), ['continue', 'until_reset', 'stop']);
+    assert.equal(spec.timeoutSeconds, 30);
+  });
+
+  const outcomes = [
+    ['continue', /選擇：繼續/],
+    ['until_reset', /選擇：到重置前不再問/],
+    ['stop', /選擇：停止/],
+    ['timeout', /逾時（視為停止）/],
+    ['dismissed', /關閉視窗（視為停止）/],
+    ['unavailable', /對話框不可用/],
+  ];
+  for (const [choice, expected] of outcomes) {
+    test(`回報結果：${choice}`, async () => {
+      const { code, text } = await run(tempDir(), async () => ({ choice, elapsedMs: 3210 }));
+      assert.equal(code, 0);
+      assert.match(text, expected);
+      assert.match(text, /耗時 3\.2 秒/);
+    });
+  }
+
+  test('不寫入任何決策或狀態檔', async () => {
+    const dir = tempDir();
+    await run(dir, async () => ({ choice: 'continue', elapsedMs: 1 }));
+    assert.equal(existsSync(join(dir, 'decision.json')), false);
+    assert.equal(existsSync(join(dir, 'snooze.json')), false);
+  });
+});
+
 test('未知的子指令回報用法', async () => {
   const { code, text } = await cli(tempDir(), 'bogus');
   assert.equal(code, 1);

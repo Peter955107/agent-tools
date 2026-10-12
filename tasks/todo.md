@@ -6,7 +6,7 @@
 - [x] 任務 1：plugin 骨架、gate.mjs 停用開關、SessionStart 建立資料夾與預設設定（M）
 - [x] 任務 2：state.mjs，包含設定驗證、原子寫入、mkdir 鎖（S）
 - [x] 任務 3：fake-usage → 正規化 → 分段 → PreToolUse 注入（每段一次、跳過 subagent）（M）
-- [ ] **檢查點 1**：VS Code 實機，fake 80% 看到注入；`DISABLED` 存在時完全靜默
+- [x] **檢查點 1**：VS Code 實機，fake 80% 看到注入；`DISABLED` 存在時完全靜默
 
 ## 第二階段：真實用量資料
 - [x] 任務 4：usage 端點輪詢，含 poll.lock、429／401／逾時／格式錯誤處理，搭配假 HTTP server 測試（M）
@@ -14,10 +14,10 @@
 - [x] 任務 6：`/usage-sentinel status | on | off | set`（S）
 - [x] 修正：本工具的 slash command 用掉了 warn 提醒的注入機會（v0.1.1）
 - [x] 規格變更：注入時以 `systemMessage` 顯示一行給使用者（v0.1.2）
-- [ ] **檢查點 2**：status 顯示真實數字；429 時不阻擋（驗收 8）
+- [x] **檢查點 2**：status 顯示真實數字；429 時不阻擋（驗收 8）
 
 ## 第三階段：停止與詢問
-- [ ] 任務 7：dialog.mjs（Windows WinForms）與 `test-dialog`（S）
+- [x] 任務 7：dialog.mjs（Windows WinForms）與 `test-dialog`（S）
 - [ ] 任務 8：觸發停止、prompt.lock、decision.json、繼續（snooze）或停止、events.log（M）
 - [ ] 任務 9：已停止狀態、收尾模式、允許清單、`resume`／`snooze` 指令（M）
 - [ ] 任務 10：ask 備援、PostToolUse 核准偵測、無人值守時直接停止（S）

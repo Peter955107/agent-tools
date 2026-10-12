@@ -1,7 +1,8 @@
 // /usage-sentinel slash command 的後端（FR-6）。只由使用者執行；agent 的呼叫由 FR-4.8 擋下。
 import { existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { buildStopDialog, showDialog } from './dialog.mjs';
 import { stateDir } from './gate.mjs';
 import { DEFAULT_CONFIG, loadConfig, mergeConfig, readJson, validateConfig, writeJson } from './state.mjs';
 import { computeTier, formatDuration } from './tiers.mjs';
@@ -12,6 +13,7 @@ const USAGE = [
   '  status                 顯示用量、分段、資料來源與狀態（預設）',
   '  on | off               開關守衛',
   '  set <key> <value>      修改設定，例如 set thresholds.stop 95',
+  '  test-dialog            用假資料跳出一次停止對話框，回報選擇與耗時',
 ].join('\n');
 
 const WINDOW_LABELS = { five_hour: '5 小時', seven_day: '7 天' };
@@ -85,7 +87,32 @@ function setConfig(dir, key, value) {
   return ok(`已設定 ${key} = ${JSON.stringify(value)}`);
 }
 
-export async function runCli(args, { env = process.env } = {}) {
+const DIALOG_OUTCOMES = {
+  continue: '選擇：繼續',
+  until_reset: '選擇：到重置前不再問',
+  stop: '選擇：停止',
+  timeout: '逾時（視為停止）',
+  dismissed: '關閉視窗（視為停止）',
+  unavailable: '對話框不可用（實際觸發時會改用權限確認視窗）',
+};
+
+// 用假資料跳出一次對話框，只回報結果，不寫入任何決策或狀態。
+async function testDialog(dir, dialog) {
+  const nowMs = Date.now();
+  const { config } = loadConfig(dir);
+  const spec = buildStopDialog({
+    trigger: { window: 'five_hour', pct: 93, resets_at: nowMs / 1000 + 72 * 60 },
+    project: basename(process.cwd()),
+    sessionId: 'test-dialog',
+    nowMs,
+    timeoutSeconds: config.prompt_timeout_seconds,
+    fake: true,
+  });
+  const { choice, elapsedMs } = await dialog(spec);
+  return ok(`test-dialog：${DIALOG_OUTCOMES[choice] ?? choice}，耗時 ${(elapsedMs / 1000).toFixed(1)} 秒`);
+}
+
+export async function runCli(args, { env = process.env, dialog = showDialog } = {}) {
   const dir = stateDir(env);
   const [command = 'status', ...rest] = args;
   switch (command) {
@@ -98,6 +125,8 @@ export async function runCli(args, { env = process.env } = {}) {
     case 'set':
       if (rest.length !== 2) return fail(USAGE);
       return setConfig(dir, rest[0], parseValue(rest[1]));
+    case 'test-dialog':
+      return testDialog(dir, dialog);
     default:
       return fail(USAGE);
   }
