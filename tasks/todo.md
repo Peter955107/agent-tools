@@ -27,7 +27,7 @@
 ## 第四階段：周邊與移除
 - [x] 任務 12：桌面 toast 與 webhook 通知（S）
 - [x] 任務 13：SessionStart 複製 bin/、寫 manifest；statusline.mjs 串接；install-statusline.mjs（M）
-- [ ] 任務 14：uninstall.mjs 本機部分（statusLine 還原、狀態資料夾、冪等、dry-run／yes／purge）（M）
+- [x] 任務 14：uninstall.mjs 本機部分（statusLine 還原、狀態資料夾、冪等、dry-run／yes／purge）（M）
 - [ ] 任務 15：uninstall.mjs 的 Claude Code 部分（執行中程序預檢、各範圍 plugin、市集、cache、設定差異、往返測試）（M）
 - [ ] 任務 16：README；macOS／Linux 對話框（次要）（S）
 - [ ] **檢查點 4**：驗收 1–21 全部通過，人工審閱後才算完成
