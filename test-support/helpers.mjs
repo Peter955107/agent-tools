@@ -30,6 +30,7 @@ export function isolatedEnv(env) {
     USAGE_SENTINEL_ENDPOINT: 'http://127.0.0.1:9/api/oauth/usage',
     USAGE_SENTINEL_DIALOG_STUB: 'stop', // 測試絕不跳出真的對話框
     USAGE_SENTINEL_NOTIFY_STUB: join(env.USAGE_SENTINEL_DIR, 'notify-stub.log'), // 也絕不發出真的通知
+    USAGE_SENTINEL_UNINSTALL_PROCESSES: '[]', // 移除工具看不到真的 Claude Code 程序
     ...env,
   };
 }
