@@ -29,6 +29,7 @@ export function isolatedEnv(env) {
     CLAUDE_CONFIG_DIR: tempDir(),
     USAGE_SENTINEL_ENDPOINT: 'http://127.0.0.1:9/api/oauth/usage',
     USAGE_SENTINEL_DIALOG_STUB: 'stop', // 測試絕不跳出真的對話框
+    USAGE_SENTINEL_NOTIFY_STUB: join(env.USAGE_SENTINEL_DIR, 'notify-stub.log'), // 也絕不發出真的通知
     ...env,
   };
 }

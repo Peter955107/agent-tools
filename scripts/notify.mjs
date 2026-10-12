@@ -26,7 +26,11 @@ function dispatch(notification, env) {
   // 測試用替身：只在設了 USAGE_SENTINEL_DIR 時生效，把通知寫進檔案。
   const stub = env.USAGE_SENTINEL_DIR && env.USAGE_SENTINEL_NOTIFY_STUB;
   if (stub) {
-    appendFileSync(stub, JSON.stringify(notification) + '\n');
+    try {
+      appendFileSync(stub, JSON.stringify(notification) + '\n');
+    } catch {
+      // 替身寫不進去也不能改成真的送出
+    }
     return;
   }
   const child = spawn(process.execPath, [WORKER], {

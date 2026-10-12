@@ -91,6 +91,17 @@ describe('guard.mjs 進入 wind-down／stop 時通知（FR-5）', () => {
   const notifications = (dir) =>
     existsSync(join(dir, 'notify-stub.log')) ? readFileSync(join(dir, 'notify-stub.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : [];
 
+  // 回歸：隔離環境原本沒有替換通知，其他測試用 86%／93% 執行 guard 時，會對桌面發出真的 toast。
+  test('沒有另外指定時，測試環境的通知一律寫進狀態資料夾裡的替身檔', () => {
+    const dir = setup(86);
+    const result = runHook('guard.mjs', {
+      input: { session_id: 's1', cwd: CWD, tool_name: 'Read', tool_input: {} },
+      env: { USAGE_SENTINEL_DIR: dir },
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.ok(existsSync(join(dir, 'notify-stub.log')), '通知應被替身攔下');
+  });
+
   test('進入 wind-down 時通知一次，跨 session 也只有一次', () => {
     const dir = setup(86);
     guard(dir, 's1');
