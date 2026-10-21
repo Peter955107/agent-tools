@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Reviewer report: .herd/results/r<task>-<hex>.json. Checked by scripts/check-report.ps1 -Kind review. No verdict and no severity: the lead verifies each finding and derives both.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["nonce", "task", "model", "scope_sha", "coverage", "findings", "prior", "aspects_checked"],
+  "properties": {
+    "nonce": { "type": "string", "pattern": "^r[0-9]+(-[0-9]+)*-[0-9a-f]{4}$" },
+    "task": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "scope_sha": { "type": "string", "pattern": "^[0-9a-f]{12}$" },
+    "coverage": {
+      "type": "array",
+      "minItems": 1,
+      "$comment": "One entry per spec scenario/example and Implementation Contract item in the brief's Basis.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "status", "evidence"],
+        "properties": {
+          "ref": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["verified", "partial", "missing"] },
+          "evidence": { "type": "string", "minLength": 1, "$comment": "test file::name and the asserting line, or the searches run" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "location", "violates", "trigger", "consequence", "fix", "confidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^R[0-9]+$" },
+          "location": { "type": "string", "minLength": 1, "$comment": "file:start-end" },
+          "violates": { "type": "string", "minLength": 1, "$comment": "spec scenario / contract item / design decision / AGENTS.md rule, or none" },
+          "trigger": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "consequence": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "fix": { "type": "string", "minLength": 1, "maxLength": 240 },
+          "confidence": { "enum": ["high", "medium", "low"] }
+        }
+      }
+    },
+    "prior": {
+      "type": "array",
+      "$comment": "Re-review only: one entry per F id listed in the brief's Prior findings; empty on a first review.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^F[0-9]+$" },
+          "status": { "enum": ["resolved", "open"] },
+          "evidence": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "aspects_checked": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+  }
+}
