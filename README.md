@@ -5,6 +5,7 @@
 | Skill | Description |
 |-------|-------------|
 | [herdr-spectra](skills/herdr-spectra/SKILL.md) | 透過 herdr 主導 Spectra change：開始前讓使用者選擇 worker 與 reviewer 用的 agent 與模型（Kiro 或 Claude Code，預設皆為 Kiro）；每個任務派給新開的 worker，完成後先 commit，再由 reviewer 以全權限審查並測試；主控（Claude）不自己審，而是逐項查證 reviewer 的發現與覆蓋證據（triage），依規則判定是否通過，再以 `spectra task done` 記錄完成並關閉 agent。agent 之間以 JSON 檔溝通（`schemas/`），並以 `scripts/check-report.ps1` 驗格式、`scripts/scope-sha.ps1` 防止報告過期。取自 server-install-wizard `00075ff`；以 Markdown 回報的舊版見本 repo commit `f5e5287`。 |
+| [herdr-agent-skills](skills/herdr-agent-skills/SKILL.md) | 透過 herdr 執行 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) 的計畫（`tasks/spec.md`、`tasks/plan.md`、`tasks/todo.md`）。架構沿用 herdr-spectra：每個任務派給新開的 worker 實作，worker 依 `incremental-implementation` 與 `test-driven-development` 工作；完成後先 commit，再由不同廠商的 reviewer 依 `code-review-and-quality` 審查並測試；主控逐項 triage reviewer 的發現，通過才勾選 `todo.md`。遇到 checkpoint 一律停下來交給人審。agent 不得修改 spec 和 plan，由 `scripts/guard-check.ps1` 事後檢查。 |
 | [show-me](skills/show-me/SKILL.md) | 用精簡的視覺化內容協助理解目前主題：依情境呈現偽程式碼、呼叫樹、元件樹、檔案結構、Mermaid 流程圖或 diff；需要呈現較複雜的 UI、版面或概念時，則產生單頁 HTML 視覺稿。 |
 
 ### 外部
