@@ -123,7 +123,7 @@ Commit the result before any reviewer sees it, so the reviewer cannot silently c
 <s>/commit-task.ps1 -Files <scope files> -TaskId <task-id> -Round <n> -Change <change>
 ```
 
-It commits only those files, logs the commit (so `guard-check.ps1` accepts it) and prints `{commit, parent}`. Round 1's `parent` is the task's **base**. Never push.
+It commits only those files, logs the commit (so `guard-check.ps1` accepts it) and prints `{commit, parent}`. Round 1's `parent` is the task's **base**. Never push. These per-round commits are rollback points; 4.7 squashes them once their group is done.
 
 ### 4.3 Review
 
@@ -165,6 +165,16 @@ Write a new brief under a new nonce: the original brief plus `## Round <n> feedb
 - `spectra task done --change "<name>" <task-index> --file <path> …`, listing every file the diff confirms. Always pass `--file`: the baseline covers the whole tree, so other changes would be misattributed.
 - Ledger: `<time> <task-id> done` plus triage summary (`F` by verdict, rejected `R` count, open `low` ids). Then close agents (5) and clean up (6).
 
+### 4.7 Squash a finished group
+
+When every task of a `tasks.md` group (`## 3. …` → tasks `3.x`) is done and no task is in flight (no agent working, no review open), replace the group's per-round commits with one:
+
+```
+<s>/squash-group.ps1 -Group <n> -Change <change> -Message "herd(<change>): <n>. <group heading>"
+```
+
+It refuses when other commits are mixed into the group's range (parallel groups, user commits): leave those commits and list them in the final report. Tasks in flight at that moment → squash after they settle, before the next dispatch. The ledger keeps the old HEAD (`was <sha>`) for recovery.
+
 ## 5. Close agents
 
 `<s>/close-agent.ps1 -Name <name> -Change <change>` once the task passes. It refuses panes without a `spawn` ledger line and agents that are not `idle`/`done`; never close panes with a bare `herdr pane close`. Leave agents of tasks handed to the user open.
@@ -182,13 +192,13 @@ Write a new brief under a new nonce: the original brief plus `## Round <n> feedb
 - Rejected findings with their reasons, so the user can overrule them.
 - Open `low` findings.
 - Progress from `spectra instructions apply --change "<name>" --json --summary`; when all done, recommend `/spectra-verify` and `/spectra-review` before `/spectra-archive`.
-- The run's commits (`git log --oneline <first base>..HEAD`), not pushed; the user keeps, squashes or redoes them via `/spectra-commit`.
+- The run's commits (`git log --oneline <first base>..HEAD`; one per group after 4.7, plus any it refused), not pushed; the user keeps, squashes or redoes them via `/spectra-commit`.
 - What was cleaned up and what was left behind.
 
 ## Never
 
 - Implement a code task, or answer an agent's dialog, for the user without asking.
-- Push, or commit anything except through `commit-task.ps1`.
+- Push, or commit or rewrite history except through `commit-task.ps1` and `squash-group.ps1`.
 - Hand a result to a reviewer before it is committed, or pass a task whose `guard-check.ps1` failed.
 - Act on a report that fails `check-report.ps1`, or pass a task on the reviewer's word alone.
 - Keep dispatching after requirements change; have the user run `/spectra-ingest` first.

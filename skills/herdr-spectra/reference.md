@@ -22,4 +22,4 @@ Kiro and Claude Code report state reliably, so `--wait` works directly.
 
 ## Re-entry
 
-After a context compaction or a restart, read `.herd/<change>.md` first. Never re-dispatch a task whose last line is `dispatched`, `commit` or a review step; resume it from there. Tasks with a `done` line are finished.
+After a context compaction or a restart, read `.herd/<change>.md` first. Never re-dispatch a task whose last line is `dispatched`, `commit` or a review step; resume it from there. Tasks with a `done` line are finished; a group with a `squash` line is squashed (its tasks' `commit` SHAs no longer exist).
