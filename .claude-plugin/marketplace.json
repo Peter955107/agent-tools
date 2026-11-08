@@ -1,0 +1,5 @@
+{
+  "name": "agent-tools",
+  "owner": { "name": "Peter955107" },
+  "plugins": [{ "name": "usage-box", "source": "./mods/usage-box" }]
+}
