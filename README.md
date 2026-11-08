@@ -16,12 +16,20 @@ Claude Code mods（以 hooks module 改變 Claude Code 介面或行為的 plugin
 |-----|-------------|
 | [usage-box](mods/usage-box/hooks/register.tsx) | 在輸入框上方顯示 5 小時與本週方案用量、context 用量：圓角進度條、時間進度刻度、重置倒數，70% 轉橘、90% 轉紅；用量到 80%、90% 時以 toast 提醒並預估用完時間。按「收合」改在狀態列顯示一行小字，`/usage-box` 叫回。需 Pro / Max 訂閱。 |
 
-本地安裝（直接讀這個資料夾，改檔後 `/reload-plugins` 即生效）：
+## 本地安裝
+
+每個 skill 與 mod 都是獨立的 plugin，可只裝需要的。直接讀這個資料夾，改檔後 `/reload-plugins` 即生效。
 
 ```
 claude plugin marketplace add <agent-tools 資料夾路徑>
+
 claude plugin install usage-box@agent-tools
+claude plugin install show-me@agent-tools
+claude plugin install herdr-spectra@agent-tools
+claude plugin install herdr-agent-skills@agent-tools
 ```
+
+停用或移除單一功能：`claude plugin disable <名稱>@agent-tools`、`claude plugin uninstall <名稱>@agent-tools`。
 
 ### 外部
 
