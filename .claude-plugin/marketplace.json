@@ -1,0 +1,33 @@
+{
+  "name": "agent-tools",
+  "owner": { "name": "Peter955107" },
+  "description": "Peter955107 的 Claude Code mods 與 skills，每個功能各自獨立安裝",
+  "plugins": [
+    {
+      "name": "usage-box",
+      "source": "./mods/usage-box",
+      "description": "在輸入框上方顯示 5 小時、本週方案用量與 context 用量"
+    },
+    {
+      "name": "show-me",
+      "source": "./",
+      "strict": false,
+      "description": "用精簡的視覺化內容協助理解目前主題",
+      "skills": ["./skills/show-me"]
+    },
+    {
+      "name": "herdr-spectra",
+      "source": "./",
+      "strict": false,
+      "description": "透過 herdr 主導 Spectra change：worker 實作、reviewer 審查、主控 triage",
+      "skills": ["./skills/herdr-spectra"]
+    },
+    {
+      "name": "herdr-agent-skills",
+      "source": "./",
+      "strict": false,
+      "description": "透過 herdr 執行 addyosmani/agent-skills 的計畫",
+      "skills": ["./skills/herdr-agent-skills"]
+    }
+  ]
+}
