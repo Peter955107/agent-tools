@@ -10,7 +10,7 @@
 <the worker report's `deviations`, verbatim>
 
 ## How to review
-Read `<path of code-review-and-quality SKILL.md>` and follow its Review Process (tests first, then the five axes). Ignore its severity labels and approval step: report every finding ungraded, as described below.
+This brief is complete. Do not activate, search for or read any skill or skill router (`using-agent-skills`, `herdr`, `herdr-agent-skills`, `code-review-and-quality`, …); the review process below is `code-review-and-quality`'s, adapted. Read the tests before the implementation. Report every finding ungraded, as described below.
 
 ## What to do
 Review and test task <task-id>: `git diff <base> <commit> -- <scope files>` is the change. Modify no files outside `.herd/results/`, run no git command that changes the index, working tree or history, and do not edit the spec, plan or todo files. Run the task's verification commands and try what the task adds or changes, as a user would; keep anything they generate out of the repo (temp directory, or delete it afterwards).

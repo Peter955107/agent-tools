@@ -11,6 +11,7 @@ The lead's own usage is the scarce resource: it orchestrates, runs the scripts a
 
 - Agents report in JSON (`schemas/`), validated by `check-report.ps1`; each report's `scope_sha` (`scope-sha.ps1`) ties it to the files it saw.
 - This skill is the Implement phase of `spec-driven-development` (its Phase 4) with the agent-skills workflow split across agents: workers follow `incremental-implementation` and `test-driven-development`, reviewers follow `code-review-and-quality`. The todo file's checkboxes are task truth; only the lead ticks them.
+- **Agents never load agent-skills.** Every agent is fresh, so a skill it loads is paid again per task and per round. The templates carry those skills' rules in a few lines; briefs never point at the four core skills, and each brief forbids skill routing (`using-agent-skills`, steering that says to activate skills). Claude Code agents start with skills disabled (`spawn-agent.ps1`). The lead itself does not load the agent-skills either; this file is enough.
 - Load the `herdr` skill first. Answer in the language CLAUDE.md / AGENTS.md requires.
 - Scripts live in `.claude/skills/herdr-agent-skills/scripts/`; run them from the repo root as `pwsh -NoProfile -File <script> …`. Below, `<s>` stands for that directory.
 - Keep tool output small: `git diff --stat` before a full diff, quiet test runners, and only the lines a finding cites plus their callers.
@@ -20,7 +21,7 @@ The lead's own usage is the scarce resource: it orchestrates, runs the scripts a
 1. `HERDR_ENV` is `1`; otherwise say the session is not inside herdr and stop.
 2. **Plan files.** Find the spec (`tasks/spec.md`, `SPEC.md`, or the module spec named in a capability map), `tasks/plan.md` and the task list target. The task list must be a markdown todo file (default `tasks/todo.md`); if `plan.md` says tasks live in an external tracker, report that this skill does not support it and stop.
 3. **Approval gate.** agent-skills requires the human to approve the spec and the plan before implementation. If the conversation or the files do not show that approval, ask once; no approval → stop.
-4. **Skill files.** Resolve the `SKILL.md` path of `incremental-implementation`, `test-driven-development`, `debugging-and-error-recovery` and `code-review-and-quality` by the `name:` in their frontmatter (search `.claude/skills/*/SKILL.md`, then `.kiro/skills/*/SKILL.md`; folder names can differ, e.g. `test-driven-development-2`). Briefs point agents at these paths. Any missing → report and stop.
+4. **Domain skills.** Only when a task needs one (`security-and-hardening`, `frontend-ui-engineering`, `api-and-interface-design`, …), resolve its `SKILL.md` path by the `name:` in its frontmatter (`.claude/skills/*/SKILL.md`, then `.kiro/skills/*/SKILL.md`). The core four are never resolved; their rules are in the templates.
 5. Full-permission mode for every agent kind the run uses (1.0). Kiro: `kiro-cli settings list` shows `chat.disableTrustAllConfirmation = true (global)`. Claude Code: `claude` on PATH; the user accepts the bypass-permissions confirmation once if the spawn script reports it. Missing → ask the user; never change an agent's settings yourself.
 6. **Change name** `<change>`: kebab-case of the plan's title (e.g. `bundle-format-v2`); used in ledger, commits and script arguments.
 7. **Protected paths**: the spec, the plan and any other files under `tasks/` except the todo file. Pass them as `-Protected` and the todo file as `-Todo` to `dispatch.ps1`.
@@ -83,7 +84,7 @@ Each dispatch gets a new nonce: `t<n>-<4 hex>` for work, `r<n>-<4 hex>` for revi
 
 - **What to do**: the task's whole entry from the todo file, verbatim.
 - **Basis**: the plan decisions, risks and spec sections the task relies on, verbatim. Find them with `grep -n '^##\|^###\|^####'`, then `sed -n '<from>,<to>p'`; never retype or summarize them. Include the spec's Boundaries and the success criteria the task traces to.
-- **How to work**: the resolved skill paths from 0.4; add a domain skill (`security-and-hardening`, `frontend-ui-engineering`, `api-and-interface-design`, …) only when the task needs it.
+- **How to work**: keep the template's rules as they are; add a domain skill path (0.4) only when the task needs it. Never add the core four skills or a skill router.
 - **Scope**: the task's "Files" list. A path written as "tests" or "(only the type usages)" becomes explicit file paths or a stated limit.
 - Read reports from the file, not the screen; the chat line only signals completion.
 
@@ -135,7 +136,7 @@ It commits only those files, logs the commit (so `guard-check.ps1` accepts it) a
 
 ### 4.3 Review
 
-1. Fill `templates/reviewer-brief.md` (Basis and Scope from the worker brief, the worker's `deviations` verbatim, the `code-review-and-quality` path, `<base>` and `<commit>` from 4.2a).
+1. Fill `templates/reviewer-brief.md` (Basis and Scope from the worker brief, the worker's `deviations` verbatim, `<base>` and `<commit>` from 4.2a).
 2. Spawn the reviewer (1.0, 1.1) and run `dispatch.ps1` with its `r…` nonce and the same `-Protected` / `-Todo`.
 3. When it reports, `<s>/guard-check.ps1 -Nonce <r-nonce> -Change <change>`. Not ok → stop and show the user `git status` and `git diff`; the commit still holds the worker's version.
 4. `<s>/check-report.ps1 -Path … -Kind review -Files <scope> [-PriorIds …]`. Not ok → send the errors once; a second failure means the review failed: log `review failed`, then spawn a new reviewer or ask the user. A failed review never passes.

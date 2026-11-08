@@ -45,7 +45,8 @@ if ($Kind -eq 'kiro') {
     $agentArgs = @('chat', '--trust-all-tools', '--model', $Model, '--effort', $Effort)
     $readyPattern = 'ask a question or describe a task'
 } else {
-    $agentArgs = @('--dangerously-skip-permissions', '--model', $Model, '--effort', $Effort)
+    # The brief carries every rule the agent needs; without skills it cannot load agent-skills or this skill per task.
+    $agentArgs = @('--dangerously-skip-permissions', '--disable-slash-commands', '--model', $Model, '--effort', $Effort)
     # shortcut: matched against Claude Code's idle footer, not tested here; adjust if a release changes it.
     $readyPattern = '\? for shortcuts'
 }
