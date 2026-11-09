@@ -27,6 +27,7 @@ const TICK = 'rgba(210,210,210,0.95)'
 const BAR_CELLS = 10
 
 const hex = (p: number) => (p >= DANGER ? RED : p >= WARN ? AMBER : GREEN)
+const rgb = (h: string) => `rgb(${[1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(',')})`
 const theme = (p: number) => (p >= DANGER ? 'error' : p >= WARN ? 'warning' : 'success')
 const pct = (p: number) => `${Math.round(p)}%`
 const clamp = (n: number) => Math.max(0, Math.min(100, n))
@@ -48,7 +49,8 @@ function svgBar(width: number, height: number, percent: number, tick: number | n
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
     `<rect width="${width}" height="${height}" rx="${r}" fill="${TRACK}"/>` +
-    (fill > 0 ? `<rect width="${fill.toFixed(1)}" height="${height}" rx="${r}" fill="${hex(percent)}"/>` : '') +
+    // rgb(), not #hex: a '#' cuts off the markup if a surface puts it in a data: URL unescaped.
+    (fill > 0 ? `<rect width="${fill.toFixed(1)}" height="${height}" rx="${r}" fill="${rgb(hex(percent))}"/>` : '') +
     (tickX === null
       ? ''
       : `<rect x="${(tickX - 1).toFixed(1)}" y="0" width="2" height="${height}" rx="1" fill="${TICK}"/>`) +
@@ -82,18 +84,16 @@ function viewOf(l: Limit, now: number): View | null {
 async function views($: EngineInterface): Promise<{ list: View[]; ctx: number | null }> {
   const s = await read($, snap)
   const now = await $.clock.now()
-  // The API omits five_hour while no 5-hour window is running, which means 0% used.
-  const limits =
-    s.limits.length > 0 && !s.limits.some(l => l.kind === 'five_hour')
-      ? [{ kind: 'five_hour', percentUsed: 0 }, ...s.limits]
-      : s.limits
+  // A missing five_hour means no reading, not 0%: the engine leaves out what it lacks.
   return {
-    list: limits.map(l => viewOf(l, now)).filter((v): v is View => v !== null),
+    list: s.limits.map(l => viewOf(l, now)).filter((v): v is View => v !== null),
     ctx: s.contextPercent,
   }
 }
 
 async function save($: EngineInterface, limits: SessionRateLimit[], ctx: SessionContextUsage) {
+  // No reading yet (fresh session, before the first response): keep the last good figures.
+  if (limits.length === 0) limits = (await read($, snap)).limits
   const next: Snapshot = {
     limits: limits.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt })),
     contextPercent: ctx.percent ?? null,
@@ -171,7 +171,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
     const { list, ctx } = await views($)
-    if (list.length === 0) return next(e)
+    if (list.length === 0 && ctx === null) return next(e)
 
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
@@ -233,7 +233,8 @@ export const register: Register = on => {
           item(v.kind, v.short, v.percentUsed, v.elapsed, v.left !== null ? `↻ ${span(v.left)}` : ''),
         )}
         {ctx !== null && item('ctx', 'ctx', ctx, null, '')}
-        <Box key="actions" flexShrink={0}>
+        <Box key="actions" flexShrink={0} gap={1}>
+          <Button key="refresh" label="刷新" plain dimColor onPress={() => refresh($)} />
           <Button key="collapse" label="收合" plain dimColor onPress={() => setMode($, 'pill')} />
         </Box>
       </Box>
