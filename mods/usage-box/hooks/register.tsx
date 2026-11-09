@@ -24,13 +24,13 @@ const AMBER = '#e3a53a'
 const RED = '#f0524f'
 const TRACK = 'rgba(140,140,140,0.22)'
 const TICK = 'rgba(210,210,210,0.95)'
-const MINI = '▁▂▃▄▅▆▇█'
+const BAR_CELLS = 10
 
 const hex = (p: number) => (p >= DANGER ? RED : p >= WARN ? AMBER : GREEN)
 const theme = (p: number) => (p >= DANGER ? 'error' : p >= WARN ? 'warning' : 'success')
 const pct = (p: number) => `${Math.round(p)}%`
 const clamp = (n: number) => Math.max(0, Math.min(100, n))
-const mini = (p: number) => MINI[Math.round((clamp(p) / 100) * 7)] ?? '▁'
+const cells = (p: number) => Math.round((clamp(p) / 100) * BAR_CELLS)
 
 function span(ms: number): string {
   const mins = Math.max(0, Math.round(ms / 60000))
@@ -82,8 +82,13 @@ function viewOf(l: Limit, now: number): View | null {
 async function views($: EngineInterface): Promise<{ list: View[]; ctx: number | null }> {
   const s = await read($, snap)
   const now = await $.clock.now()
+  // The API omits five_hour while no 5-hour window is running, which means 0% used.
+  const limits =
+    s.limits.length > 0 && !s.limits.some(l => l.kind === 'five_hour')
+      ? [{ kind: 'five_hour', percentUsed: 0 }, ...s.limits]
+      : s.limits
   return {
-    list: s.limits.map(l => viewOf(l, now)).filter((v): v is View => v !== null),
+    list: limits.map(l => viewOf(l, now)).filter((v): v is View => v !== null),
     ctx: s.contextPercent,
   }
 }
@@ -177,6 +182,9 @@ export const register: Register = on => {
 
     // Collapsed: the band steps aside; the status line carries the figures.
     if (current === 'pill') return next(e)
+    // Other mods share this slot (e.g. ponytail band): stack theirs below instead of replacing it.
+    // next(e) rejects only when nothing answers beneath.
+    const below = await next(e).catch(() => undefined)
 
     // One line of meters. Each meter is an unbreakable unit; when the band is
     // narrow, whole units move to the next line with no extra space between.
@@ -184,7 +192,24 @@ export const register: Register = on => {
       <Box key={key} flexDirection="row" flexWrap="nowrap" flexShrink={0} alignItems="center" gap={1}>
         <Text dimColor>{label}</Text>
         {isText || !Svg ? (
-          <Text color={theme(p)}>{mini(p)}</Text>
+          <Text>
+            {Array.from({ length: BAR_CELLS }, (_, i) =>
+              // The elapsed-time tick takes one cell: usage left of it is ahead of pace.
+              tick !== null && i === Math.min(BAR_CELLS - 1, Math.floor((tick / 100) * BAR_CELLS)) ? (
+                <Text key={i} bold>
+                  ┃
+                </Text>
+              ) : i < cells(p) ? (
+                <Text key={i} color={theme(p)}>
+                  █
+                </Text>
+              ) : (
+                <Text key={i} dimColor>
+                  ░
+                </Text>
+              ),
+            )}
+          </Text>
         ) : (
           <Svg source={svgBar(48, 6, p, tick)} alt={`${label} ${pct(p)}`} width={48} height={6} />
         )}
@@ -194,7 +219,7 @@ export const register: Register = on => {
         {extra !== '' && <Text dimColor>{extra}</Text>}
       </Box>
     )
-    return (
+    const row = (
       <Box
         key="usage-row"
         flexDirection="row"
@@ -213,5 +238,6 @@ export const register: Register = on => {
         </Box>
       </Box>
     )
+    return below ? <Box flexDirection="column">{row}{below}</Box> : row
   })
 }
