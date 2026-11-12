@@ -23,6 +23,13 @@
       "skills": ["./skills/herdr-spectra"]
     },
     {
+      "name": "herdr-takeover",
+      "source": "./",
+      "strict": false,
+      "description": "透過 herdr 取得另一個 agent 的任務脈絡、確認交接並接續未完成的工作",
+      "skills": ["./skills/herdr-takeover"]
+    },
+    {
       "name": "herdr-agent-skills",
       "source": "./",
       "strict": false,
