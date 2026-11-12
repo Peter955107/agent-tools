@@ -1,6 +1,6 @@
 ---
 name: herdr-spectra
-description: Lead a Spectra change through herdr - each task goes to a fresh worker agent (Kiro or Claude Code) in its own pane, the result is committed, a second agent reviews and tests it, and this session triages the review before spectra task done. Use when a Spectra change should be implemented or reviewed by other agents, even without saying herdr - Kiro, Codex, worker/reviewer agents, delegating, parallel agents, 分派、派給 Kiro、多 agent 協作、讓別的模型審查. Prefer it over /spectra-apply then; not for plain herdr pane questions (use the herdr skill).
+description: Lead a Spectra change through herdr - each task goes to a fresh worker agent (Kiro, Claude Code or Codex) in its own pane, the result is committed, a second agent reviews and tests it, and this session triages the review before spectra task done. Use when a Spectra change should be implemented or reviewed by other agents, even without saying herdr - Kiro, Codex, worker/reviewer agents, delegating, parallel agents, 分派、派給 Kiro、多 agent 協作、讓別的模型審查. Prefer it over /spectra-apply then; not for plain herdr pane questions (use the herdr skill).
 ---
 
 # herdr + Spectra
@@ -19,7 +19,7 @@ The lead's own usage is the scarce resource: it orchestrates, runs the scripts a
 
 1. `HERDR_ENV` is `1`; otherwise say the session is not inside herdr and stop.
 2. Spectra CLI: `spectra` on PATH, else `$LOCALAPPDATA/Spectra/spectra.exe`; neither → report and stop.
-3. Full-permission mode for every agent kind the run uses (1.0). Kiro: `kiro-cli settings list` shows `chat.disableTrustAllConfirmation = true (global)`. Claude Code: `claude` on PATH; the user accepts the bypass-permissions confirmation once if the spawn script reports it. Missing → ask the user; never change an agent's settings yourself.
+3. Full-permission mode for every agent kind the run uses (1.0). Kiro: `kiro-cli settings list` shows `chat.disableTrustAllConfirmation = true (global)`. Claude Code: `claude` on PATH; the user accepts the bypass-permissions confirmation once if the spawn script reports it. Codex: `codex` on PATH (started with `--dangerously-bypass-approvals-and-sandbox`). Missing → ask the user; never change an agent's settings yourself.
 4. Run `/spectra-apply` steps 1–4 as written (select and announce the change, status/parking, `spectra instructions apply --change "<name>" --json --compact`, `spectra analyze`, drift, read `tdd`/`audit`). Dispatch replaces its step 5.
 5. `.herd/` at the repo root, listed in `.git/info/exclude`:
    ```
@@ -43,14 +43,18 @@ Dispatch every pending task by default. Before starting, show the plan: task →
 
 ### 1.0 Pick the agents
 
-Once per run, before the plan, ask with `AskUserQuestion`: two questions, worker and reviewer, defaults first and marked "(Recommended)". Skip a question the user already answered.
+Once per run, before the plan, ask with `AskUserQuestion` in two steps, defaults first and marked "(Recommended)". Skip a question the user already answered.
 
-| Question | Options |
-|---|---|
-| Worker | Kiro · `claude-sonnet-5.5` (Recommended); Claude Code · `claude-sonnet-5-5`; Kiro · `claude-haiku-5.5`; Claude Code · `claude-haiku-5-5` |
-| Reviewer | Kiro · `gpt-5.6-terra` (Recommended); Claude Code · `claude-opus-5-5`; Kiro · `claude-opus-5.5` |
+1. **Agent**: two questions, worker agent and reviewer agent, each with options Kiro · Claude Code · Codex. Default: Kiro for both.
+2. **Model**: two questions, worker model and reviewer model, offering only the models of the agent picked in step 1:
 
-"Other" accepts any agent and model (e.g. Claude Code · `claude-opus-5-5`); verify Kiro models with `kiro-cli chat --list-models` and ask again if one does not exist. Kiro IDs use a dot, Claude Code IDs a dash. Record the picks in the ledger. If the reviewer ends up on the worker's vendor or a weaker model, say so once in the plan and continue.
+| Agent (`-Kind`) | Worker models | Reviewer models |
+|---|---|---|
+| Kiro (`kiro`) | `claude-sonnet-5.5` (Recommended); `claude-haiku-5.5` | `gpt-5.6-terra` (Recommended); `claude-opus-5.5` |
+| Claude Code (`claude`) | `claude-sonnet-5-5` (Recommended); `claude-haiku-5-5` | `claude-opus-5-5` (Recommended); `claude-sonnet-5-5` |
+| Codex (`codex`) | `gpt-6.1-terra` (Recommended); `gpt-6-luna` | `gpt-6.1-sol` (Recommended); `gpt-6.1-terra` |
+
+"Other" accepts any model of that agent. Verify it exists and ask again if not: Kiro with `kiro-cli chat --list-models`, Codex with `jq -r '.models[].slug' ~/.codex/models_cache.json`. Kiro IDs use a dot, Claude Code IDs a dash. Record the picks in the ledger. If the reviewer ends up on the worker's vendor or a weaker model, say so once in the plan and continue.
 
 ### 1.1 Effort
 
@@ -70,7 +74,7 @@ The lead sets effort per task from the task text, scope and spec, and writes dow
 ### 1.2 Escalation
 
 - **Round 1** (first rework): same worker, same model and effort.
-- **Round 2**: a new worker of the same kind, effort +1 (`low` → `medium` → `high` → `xhigh`); already at `xhigh`, next stronger model of the same vendor (haiku → sonnet → opus). Its brief carries every round's feedback.
+- **Round 2**: a new worker of the same kind, effort +1 (`low` → `medium` → `high` → `xhigh`); already at `xhigh`, next stronger model of the same vendor (haiku → sonnet → opus; Codex: luna → terra → sol). Its brief carries every round's feedback.
 - After round 2, ask the user. Log every escalation with its reason.
 
 ## 2. Brief
@@ -86,7 +90,7 @@ Each dispatch gets a new nonce: `t<task>-<4 hex>` for work, `r<task>-<4 hex>` fo
 One fresh agent per task, never an existing pane; rework round 1 reuses the task's worker. At most 4 agents at once.
 
 ```
-<s>/spawn-agent.ps1 -Name <name> -Role worker|reviewer -Kind kiro|claude -Model <model> -Effort <effort> -Reason "<why>" -Change <change> -TaskId <task-id> [-FromPane <pane>]
+<s>/spawn-agent.ps1 -Name <name> -Role worker|reviewer -Kind kiro|claude|codex -Model <model> -Effort <effort> -Reason "<why>" -Change <change> -TaskId <task-id> [-FromPane <pane>]
 ```
 
 - Name: `w-<task>-<last 4 of nonce>` or `r-…` (e.g. `w-1-2-a7f3`).

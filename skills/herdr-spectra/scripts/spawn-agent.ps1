@@ -3,8 +3,8 @@
 Spawn a fresh agent in a new herdr pane, confirm it is ready for input, and log it to the ledger.
 
 .DESCRIPTION
-Splits -FromPane (default: the caller's pane) toward its longer side, starts the agent (Kiro or
-Claude Code) with an explicit model and effort and all tools trusted, then polls the visible screen
+Splits -FromPane (default: the caller's pane) toward its longer side, starts the agent (Kiro,
+Claude Code or Codex) with an explicit model and effort and all tools trusted, then polls the visible screen
 until the agent's input prompt appears. Both roles get full permissions so a reviewer can run the
 CLI commands a worker wrote; what either changed is caught afterwards (guard-snapshot.ps1, and for
 reviewers the commit taken before review). Prints one JSON line {name, pane_id, role, kind, model, effort}
@@ -21,7 +21,7 @@ param(
     [Parameter(Mandatory)][string]$Reason,
     [Parameter(Mandatory)][string]$Change,
     [Parameter(Mandatory)][string]$TaskId,
-    [ValidateSet('kiro', 'claude')][string]$Kind = 'kiro',
+    [ValidateSet('kiro', 'claude', 'codex')][string]$Kind = 'kiro',
     [string]$FromPane = $env:HERDR_PANE_ID,
     [string]$Cwd = (Get-Location).Path,
     [int]$ReadySeconds = 60
@@ -44,6 +44,10 @@ $pane = (Invoke-Herdr pane split $FromPane --direction $direction --cwd $Cwd --n
 if ($Kind -eq 'kiro') {
     $agentArgs = @('chat', '--trust-all-tools', '--model', $Model, '--effort', $Effort)
     $readyPattern = 'ask a question or describe a task'
+} elseif ($Kind -eq 'codex') {
+    $agentArgs = @('--dangerously-bypass-approvals-and-sandbox', '--model', $Model, '-c', "model_reasoning_effort=`"$Effort`"")
+    # shortcut: assumes Codex's TUI footer shows "? for shortcuts" like Claude Code; untested, adjust if spawn times out.
+    $readyPattern = '\? for shortcuts'
 } else {
     $agentArgs = @('--dangerously-skip-permissions', '--model', $Model, '--effort', $Effort)
     # shortcut: matched against Claude Code's idle footer, not tested here; adjust if a release changes it.
