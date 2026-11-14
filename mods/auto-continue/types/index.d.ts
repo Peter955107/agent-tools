@@ -1,8 +1,10 @@
-/** What the pane shows: the recorded session and when 繼續 is next typed. */
-export type Status = { sessionId: string | null; nextAt: number | null }
+/** One recorded session: where it runs and when 繼續 is typed (null: no reset time yet). */
+export type Entry = { sessionId: string; root: string; nextAt: number | null }
+/** What the pane shows: every recorded session, read from the shared file. */
+export type Status = { sessions: Entry[]; self: string }
 
 declare module 'claude-code' {
   interface PluginState {
-    'auto-continue': { status: Status }
+    'auto-continue': { status: Shaped<Status> }
   }
 }
