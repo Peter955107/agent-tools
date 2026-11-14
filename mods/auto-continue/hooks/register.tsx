@@ -36,8 +36,9 @@ async function arm($: EngineInterface) {
 async function fire($: EngineInterface, resetsAt: string) {
   timer = undefined
   await $.store.set(K_FIRED, resetsAt)
-  await update($, status, s => ({ ...s, nextAt: null }))
-  // The next window's resetsAt arrives with this turn's response; session.measure re-arms.
+  // One /auto-continue buys one 繼續: clear the record so it never repeats.
+  await $.store.delete(K_ID)
+  await update($, status, () => ({ sessionId: null, nextAt: null }))
   await $.prompt.submit({ text: '繼續', asUser: true })
 }
 
@@ -57,7 +58,7 @@ export const register: Register = on => {
     const ran = await next(e)
     await $.command.register({
       name: 'auto-continue',
-      description: '記錄此 session，5 小時用量重置 1 分鐘後自動輸入「繼續」（off 停用）',
+      description: '記錄此 session，5 小時用量重置 1 分鐘後輸入一次「繼續」（off 取消）',
       immediate: true,
     })
     await arm($)

@@ -13,7 +13,7 @@
     {
       "name": "auto-continue",
       "source": "./mods/auto-continue",
-      "description": "記錄 session，5 小時用量重置 1 分鐘後自動輸入「繼續」"
+      "description": "記錄 session，5 小時用量重置 1 分鐘後輸入一次「繼續」"
     },
     {
       "name": "show-me",
