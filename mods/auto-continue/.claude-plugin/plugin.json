@@ -1,0 +1,1 @@
+{ "name": "auto-continue", "version": "0.1.0", "description": "Record this session and type 繼續 one minute after the 5-hour limit resets", "types": "./types/index.d.ts" }
