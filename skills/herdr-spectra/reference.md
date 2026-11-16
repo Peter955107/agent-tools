@@ -5,7 +5,8 @@ Read the section you need; SKILL.md points here.
 ## Parallel tasks
 
 - Only tasks whose `[after: …]` prerequisites are done and whose files and tests are disjoint; never two tasks touching the same file.
-- All workers share the main checkout. Dispatch each with `dispatch.ps1 … -NoWait`, then `herdr agent wait <name> --timeout 1800000` for each.
+- All workers share the main checkout. Run one `dispatch.ps1` (without `-NoWait`) per agent as its own background command: its `agent prompt --wait` only settles after it has seen that agent start working. A standalone `herdr agent wait` after `-NoWait` returns at once when the agent was already `idle`/`done`, so it cannot tell that a new turn began.
+- `idle`/`done` is not proof the work finished: an agent waiting on its own background shell goes idle between steps. When the wait returns without a report file, read the screen before deciding (Wait results below).
 - Do not edit a working worker's files.
 - On every `guard-check.ps1` while others run, pass the other running tasks' scope files as `-Ignore`.
 - Worktrees only when the user asks: `herdr worktree create` branches from HEAD, so first carry uncommitted changes (untracked included) into it; it opens a new workspace (find its root pane with `herdr pane list --workspace <id>` and pass it as `-FromPane`); its commits land on another branch; `worktree remove` keeps the branch.

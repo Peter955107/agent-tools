@@ -4,8 +4,9 @@ Spawn a fresh agent in a new herdr pane, confirm it is ready for input, and log 
 
 .DESCRIPTION
 Splits -FromPane (default: the caller's pane) toward its longer side, starts the agent (Kiro,
-Claude Code or Codex) with an explicit model and effort and all tools trusted, then polls the visible screen
-until the agent's input prompt appears. Both roles get full permissions so a reviewer can run the
+Claude Code or Codex) with an explicit model and effort and all tools trusted. Readiness comes from
+`herdr agent start`, which returns only once the agent is ready for input (`agent_not_ready` when it is
+blocked at startup); the screen is read once only to catch the full-permission confirmation. Both roles get full permissions so a reviewer can run the
 CLI commands a worker wrote; what either changed is caught afterwards (guard-snapshot.ps1, and for
 reviewers the commit taken before review). Prints one JSON line {name, pane_id, role, kind, model, effort}
 on success; exits 1 with a reason otherwise. On failure the new pane is left open so the lead can inspect it.
@@ -23,8 +24,7 @@ param(
     [Parameter(Mandatory)][string]$TaskId,
     [ValidateSet('kiro', 'claude', 'codex')][string]$Kind = 'kiro',
     [string]$FromPane = $env:HERDR_PANE_ID,
-    [string]$Cwd = (Get-Location).Path,
-    [int]$ReadySeconds = 60
+    [string]$Cwd = (Get-Location).Path
 )
 $ErrorActionPreference = 'Stop'
 $herdr = $env:HERDR_BIN_PATH
@@ -43,28 +43,18 @@ $pane = (Invoke-Herdr pane split $FromPane --direction $direction --cwd $Cwd --n
 # Both roles run unattended with every tool trusted; the lead checks their changes afterwards.
 if ($Kind -eq 'kiro') {
     $agentArgs = @('chat', '--trust-all-tools', '--model', $Model, '--effort', $Effort)
-    $readyPattern = 'ask a question or describe a task'
 } elseif ($Kind -eq 'codex') {
     $agentArgs = @('--dangerously-bypass-approvals-and-sandbox', '--model', $Model, '-c', "model_reasoning_effort=`"$Effort`"")
-    # shortcut: assumes Codex's TUI footer shows "? for shortcuts" like Claude Code; untested, adjust if spawn times out.
-    $readyPattern = '\? for shortcuts'
 } else {
     $agentArgs = @('--dangerously-skip-permissions', '--model', $Model, '--effort', $Effort)
-    # shortcut: matched against Claude Code's idle footer, not tested here; adjust if a release changes it.
-    $readyPattern = '\? for shortcuts'
 }
-& $herdr agent start $Name --kind $Kind --pane $pane --timeout 90000 -- @agentArgs 2>&1 | Out-Null
-
-# agent start can report idle while a dialog is on screen, so wait for the real input prompt.
-$deadline = (Get-Date).AddSeconds($ReadySeconds)
-$screen = ''
-while ((Get-Date) -lt $deadline) {
-    $screen = & $herdr agent read $Name --source visible 2>&1 | Out-String
-    if ($screen -match $readyPattern) { break }
-    if ($screen -match 'Yes, I accept') { Write-Error "$Name ($pane) shows the full-permission risk confirmation (Kiro: chat.disableTrustAllConfirmation not set; Claude: bypass-permissions mode not yet accepted). Ask the user."; exit 1 }
-    Start-Sleep -Milliseconds 1000
-}
-if ($screen -notmatch $readyPattern) { Write-Error "$Name ($pane) did not reach its input prompt within ${ReadySeconds}s. Last screen:`n$screen"; exit 1 }
+# agent start returns only once herdr sees the agent ready for input; agent_not_ready (exit 1) means it is blocked at startup.
+$started = & $herdr agent start $Name --kind $Kind --pane $pane --timeout 90000 -- @agentArgs 2>&1 | Out-String
+$startExit = $LASTEXITCODE
+$screen = & $herdr agent read $Name --source visible 2>&1 | Out-String
+# herdr may not recognise this dialog, and the lead must never answer it for the user.
+if ($screen -match 'Yes, I accept') { Write-Error "$Name ($pane) shows the full-permission risk confirmation (Kiro: chat.disableTrustAllConfirmation not set; Claude: bypass-permissions mode not yet accepted). Ask the user."; exit 1 }
+if ($startExit -ne 0) { Write-Error "$Name ($pane) is not ready: $started`nScreen:`n$screen"; exit 1 }
 # Claude Code's status line shows a display name, not the model ID, so only Kiro's is checked.
 if ($Kind -eq 'kiro' -and $screen -notmatch [regex]::Escape($Model)) { Write-Error "$Name ($pane) is ready but its status line does not show model $Model."; exit 1 }
 
