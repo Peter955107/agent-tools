@@ -1,1 +1,1 @@
-{ "name": "auto-continue", "version": "0.2.0", "description": "Record sessions and type 繼續 once in each, one minute after the 5-hour limit resets", "types": "./types/index.d.ts" }
+{ "name": "auto-continue", "version": "0.3.0", "description": "Record sessions and, if one stopped on the usage limit, type 繼續 once in it one minute after the 5-hour limit resets", "types": "./types/index.d.ts" }
