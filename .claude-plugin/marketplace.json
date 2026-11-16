@@ -16,6 +16,11 @@
       "description": "記錄多個 session，5 小時用量重置 1 分鐘後各輸入一次「繼續」"
     },
     {
+      "name": "usage-sentinel",
+      "source": "./mods/usage-sentinel",
+      "description": "用量守衛：接近 5 小時或每週用量上限時，提醒收尾、停下並詢問是否繼續"
+    },
+    {
       "name": "show-me",
       "source": "./",
       "strict": false,

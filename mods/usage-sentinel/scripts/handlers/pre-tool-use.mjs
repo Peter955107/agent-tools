@@ -1,0 +1,45 @@
+import { activeStop, askResponse, resolveStop, stopModeResponse } from '../decision.mjs';
+import { dialogFor } from '../dialog.mjs';
+import { injectionFor, injectionOutput, usageState } from '../inject.mjs';
+import { maybeNotify } from '../notify.mjs';
+import { selfProtection, selfProtectionOutput } from '../self-protect.mjs';
+import { loadConfig } from '../state.mjs';
+
+async function decide(input, { dir, env }, config) {
+  // 自我保護在任何分段都生效，也優先於收尾允許清單（FR-4.8）。
+  const protection = selfProtection(input, { env });
+  if (protection) return selfProtectionOutput(protection);
+
+  const nowMs = Date.now();
+  // 已停止狀態每次都要重新套用：視窗重新載入會自動接續被中斷的回合（A20）。
+  const stop = activeStop(dir, nowMs);
+  if (stop) return stopModeResponse(input, stop, { dir, config });
+
+  const ctx = { dir, config, env, nowMs };
+  const state = await usageState(ctx);
+  // 在跳出對話框之前通知，使用者不在電腦前也能知道（FR-5）。
+  maybeNotify(input, ctx, state);
+  // 資料不可用時不阻擋（FR-3）；subagent 的呼叫也要套用停止（FR-2）。
+  if (state.assessment.available) {
+    const outcome = await resolveStop({ ...ctx, input, result: state.result, snapshot: state.snapshot, dialog: dialogFor(env) });
+    if (outcome?.kind === 'stopped') return stopModeResponse(input, outcome.stop, { dir, config });
+    if (outcome?.kind === 'ask') return askResponse(outcome.pending, Date.now());
+  }
+
+  const injection = injectionFor(input, ctx, state);
+  // 「繼續」與一般狀態都不輸出 permissionDecision：輸出 allow 會跳過使用者的權限確認（A8）。
+  return injection === undefined ? undefined : injectionOutput('PreToolUse', injection);
+}
+
+export async function handlePreToolUse(input, { dir, env }) {
+  const { config } = loadConfig(dir);
+  if (!config.enabled) return undefined;
+  try {
+    return await decide(input, { dir, env }, config);
+  } catch (error) {
+    // hook 出錯一律放行（§6），唯一例外是已確定的停止決策。
+    const stop = activeStop(dir, Date.now());
+    if (stop) return stopModeResponse(input, stop, { dir, config });
+    throw error;
+  }
+}
