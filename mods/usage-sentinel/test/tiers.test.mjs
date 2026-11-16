@@ -114,12 +114,14 @@ describe('injectionText', () => {
     assert.match(text, /7 天用量 40%/);
   });
 
-  test('wind-down：含四點收尾指示與 resume_file 名稱', () => {
+  test('wind-down：含收尾指示與 resume_file 名稱', () => {
     const result = computeTier(snapshot([['five_hour', 86]]), config, NOW_MS);
     const text = injectionText(result, { ...config, resume_file: 'NOTES.md' }, NOW_MS);
     assert.match(text, /不要開始新的大型步驟/);
     assert.match(text, /commit/);
-    assert.match(text, /NOTES\.md/);
+    assert.match(text, /整份覆寫 NOTES\.md/);
+    assert.match(text, /不是專案文件/);
+    assert.match(text, /完成後刪除本檔/);
     assert.match(text, /plan/);
   });
 
