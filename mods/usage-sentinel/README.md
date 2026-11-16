@@ -23,7 +23,7 @@ claude plugin install usage-sentinel@agent-tools
 |---|---|---|
 | normal | < 75% | 不干預 |
 | warn | ≥ 75% | 顯示一行用量資訊 |
-| wind_down | ≥ 85% | 要 Claude 不開新的大步驟、commit、整份覆寫 `RESUME.md`（只寫目前狀態，檔頭標明是暫時接續筆記、不是專案文件，任務完成後刪除）與更新 plan，並發桌面通知 |
+| wind_down | ≥ 85% | 要 Claude 不開新的大步驟、在本機 commit（訊息以 `wip(usage-sentinel):` 開頭、不 push、不含 `RESUME.md`，接手者先 `git reset --soft` 解開再繼續）、整份覆寫 `RESUME.md`（只寫目前狀態，檔頭標明是暫時接續筆記、不是專案文件，任務完成後刪除）與更新 plan，並發桌面通知 |
 | stop | ≥ 92% | 停下並詢問：繼續／到重置前不再問（只有 5 小時視窗）／停止 |
 
 選擇「停止」後只允許 `git add`／`git commit`，以及編輯 `resume_file`、`plan_files`，其他工具呼叫都會被擋下。這個狀態會持續到視窗重置或執行 `resume` 為止。

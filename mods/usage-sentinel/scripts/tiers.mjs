@@ -70,9 +70,9 @@ export function injectionText(result, config, nowMs) {
   return [
     `${line}。已進入收尾階段，請：`,
     '1. 不要開始新的大型步驟。',
-    '2. 把手上的修改 commit。',
+    `2. 把手上的修改 commit 在本機（不要 push），訊息以「wip(usage-sentinel):」開頭；不要把 ${config.resume_file} 加進 commit。`,
     `3. 整份覆寫 ${config.resume_file}（不要接在舊內容後面），只寫現在的狀態：做了什麼、下一步、未完成的地方；之前寫的段落若已完成或過時就刪掉，不要留著。`,
-    `4. ${config.resume_file} 第一行寫：「> usage-sentinel 暫時接續筆記（<日期時間>），不是專案文件。接手者依此繼續；結論與文件寫回 plan 或正式文件，不要寫進本檔；任務全部完成後刪除本檔。」`,
+    `4. ${config.resume_file} 第一行寫：「> usage-sentinel 暫時接續筆記（<日期時間>），不是專案文件。接手者先用 git reset --soft 解開最上面連續的 wip(usage-sentinel): commit，再依此繼續；結論與文件寫回 plan 或正式文件，不要寫進本檔；任務全部完成後刪除本檔。」`,
     `5. 若有 plan 文件${planHint}，在 plan 上標記目前進度。`,
   ].join('\n');
 }

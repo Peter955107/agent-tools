@@ -120,6 +120,8 @@ describe('injectionText', () => {
     assert.match(text, /不要開始新的大型步驟/);
     assert.match(text, /commit/);
     assert.match(text, /整份覆寫 NOTES\.md/);
+    assert.match(text, /不要 push/);
+    assert.match(text, /git reset --soft 解開最上面連續的 wip\(usage-sentinel\): commit/);
     assert.match(text, /不是專案文件/);
     assert.match(text, /完成後刪除本檔/);
     assert.match(text, /plan/);
