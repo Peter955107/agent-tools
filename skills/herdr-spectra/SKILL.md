@@ -119,21 +119,21 @@ The diff and the scripts are the evidence, not the worker's account. Any failure
 - Run the verification commands yourself and compare with `verification`; for test tasks, repeat each `break_checks` entry (`git checkout -- <file>` restores).
 - Run the project's type checker or linter on the touched files, as AGENTS.md specifies.
 
-### 4.2a Commit
+### 4.2a Snapshot
 
-Commit the result before any reviewer sees it, so the reviewer cannot silently change the code under review.
+Freeze the result before any reviewer sees it, so the reviewer cannot silently change the code under review. The snapshot is a side ref; HEAD and the branch do not move.
 
 ```
-<s>/commit-task.ps1 -Files <scope files> -TaskId <task-id> -Round <n> -Change <change>
+<s>/snapshot-round.ps1 -Files <scope files> -TaskId <task-id> -Round <n> -Change <change>
 ```
 
-It commits only those files, logs the commit (so `guard-check.ps1` accepts it) and prints `{commit, parent}`. Round 1's `parent` is the task's **base**. Never push. These per-round commits are rollback points; 4.7 squashes them once their group is done.
+It stores only those files at `refs/herd/<change>/<task-id>/r<n>`, logs it and prints `{commit, parent, ref}`. Round 1's `parent` is the task's **base**; later rounds chain on the previous round, so `git diff <base> <commit>` shows only this task even after other tasks land. Rollback to a round: `git checkout <ref> -- <files>`.
 
 ### 4.3 Review
 
 1. Fill `templates/reviewer-brief.md` (Basis and Scope from the worker brief, the worker's `deviations` verbatim, `<base>` and `<commit>` from 4.2a).
 2. Spawn the reviewer (1.0, 1.1) and run `dispatch.ps1` with its `r…` nonce (no `task start`).
-3. When it reports, `<s>/guard-check.ps1 -Nonce <r-nonce> -Change <change>`. Not ok → stop and show the user `git status` and `git diff`; the commit still holds the worker's version.
+3. When it reports, `<s>/guard-check.ps1 -Nonce <r-nonce> -Change <change>`. Not ok → stop and show the user `git status` and `git diff`; the snapshot ref still holds the worker's version.
 4. `<s>/check-report.ps1 -Path … -Kind review -Files <scope> [-PriorIds …]`. Not ok → send the errors once; a second failure means the review failed: log `review failed`, then spawn a new reviewer or ask the user. A failed review never passes.
 
 ### 4.4 Triage
@@ -162,22 +162,21 @@ Check the reviewer's report item by item and record every decision in `.herd/tri
 
 ### 4.5 Rework
 
-Write a new brief under a new nonce: the original brief plus `## Round <n> feedback` with the open `F` findings as `[{id, verdict, location, detail, fix}]`. Dispatch it to the worker 1.2 names (round 2: close the old worker first). After 4.1–4.2a, the same reviewer re-reviews `git diff <base> <new commit>` with the findings under Prior findings (`-PriorIds` on the check). At most 2 rounds, then ask the user.
+Write a new brief under a new nonce: the original brief plus `## Round <n> feedback` with the open `F` findings as `[{id, verdict, location, detail, fix}]`. Dispatch it to the worker 1.2 names (round 2: close the old worker first). After 4.1–4.2a, the same reviewer re-reviews `git diff <base> <new snapshot>` with the findings under Prior findings (`-PriorIds` on the check). At most 2 rounds, then ask the user.
 
 ### 4.6 Pass
 
 - `spectra task done --change "<name>" <task-index> --file <path> …`, listing every file the diff confirms. Always pass `--file`: the baseline covers the whole tree, so other changes would be misattributed.
+- Land the task as **one** commit on the branch, holding its scope files and the `tasks.md` checkbox:
+
+  ```
+  <s>/land-task.ps1 -Files <scope files> -TaskId <task-id> -Change <change> -Subject "<type>(<scope>): <title>" -Body "<what + why>"
+  ```
+
+  It refuses unless the staged scope files equal the last reviewed snapshot, and runs every hook. Write the subject and body per `.gitmessage` for a reader of `git log` a year from now: what the task changed in behavior and why, in the language AGENTS.md requires. Never a bookkeeping subject (`勾選 task 2.5`, `task 3.1 round 2`, `herd(...)`); the script rejects those. Task id and round count go in the trailers it adds.
 - Ledger: `<time> <task-id> done` plus triage summary (`F` by verdict, rejected `R` count, open `low` ids). Then close agents (5) and clean up (6).
 
-### 4.7 Squash a finished group
-
-When every task of a `tasks.md` group (`## 3. …` → tasks `3.x`) is done and no task is in flight (no agent working, no review open), replace the group's per-round commits with one:
-
-```
-<s>/squash-group.ps1 -Group <n> -Change <change> -Message "herd(<change>): <n>. <group heading>"
-```
-
-It refuses when other commits are mixed into the group's range (parallel groups, user commits): leave those commits and list them in the final report. Tasks in flight at that moment → squash after they settle, before the next dispatch. The ledger keeps the old HEAD (`was <sha>`) for recovery.
+The branch only ever gains one commit per passed task, so parallel tasks may interleave freely and nothing is squashed or rewritten afterwards. Lead commits of Spectra artifacts (spike results, spec fixes) follow the same message rule; append `<time> lead land <sha>` to the ledger so `guard-check.ps1` accepts them.
 
 ## 5. Close agents
 
@@ -186,7 +185,7 @@ It refuses when other commits are mixed into the group's range (parallel groups,
 ## 6. Clean up `.herd/`
 
 - Task passes: delete its briefs, reports, guard files and triage file; the ledger line is the record.
-- Run ends: run `/spectra-apply` step 6, delete the ledger, and remove `.herd/` if empty.
+- Run ends: run `/spectra-apply` step 6, delete the snapshot refs (`git for-each-ref --format="delete %(refname)" refs/herd/<change>/ | git update-ref --stdin`), delete the ledger, and remove `.herd/` if empty.
 - Keep files of blocked or handed-over tasks and say so in the final report.
 - Delete only files this skill created.
 
@@ -196,14 +195,14 @@ It refuses when other commits are mixed into the group's range (parallel groups,
 - Rejected findings with their reasons, so the user can overrule them.
 - Open `low` findings.
 - Progress from `spectra instructions apply --change "<name>" --json --summary`; when all done, recommend `/spectra-verify` and `/spectra-review` before `/spectra-archive`.
-- The run's commits (`git log --oneline <first base>..HEAD`; one per group after 4.7, plus any it refused), not pushed; the user keeps, squashes or redoes them via `/spectra-commit`.
+- The run's commits (`git log --oneline <first base>..HEAD`; one per passed task plus lead artifact commits), not pushed.
 - What was cleaned up and what was left behind.
 
 ## Never
 
 - Implement a code task, or answer an agent's dialog, for the user without asking.
-- Push, or commit or rewrite history except through `commit-task.ps1` and `squash-group.ps1`.
-- Hand a result to a reviewer before it is committed, or pass a task whose `guard-check.ps1` failed.
+- Push, rewrite history, or commit task work except through `land-task.ps1`.
+- Hand a result to a reviewer before it is snapshotted, or pass a task whose `guard-check.ps1` failed.
 - Act on a report that fails `check-report.ps1`, or pass a task on the reviewer's word alone.
 - Keep dispatching after requirements change; have the user run `/spectra-ingest` first.
 - Create workspaces, tabs or worktrees without consent (agent panes from section 3 are fine).

@@ -4,7 +4,7 @@ Compare the guard state saved by dispatch.ps1 with the current one and list ever
 
 .DESCRIPTION
 Flags: a changed stash list; a HEAD that was reset/rewritten or gained a commit the ledger does not list
-(the lead's commit-task.ps1 commits are listed); changes under docs/spectra/ other than tasks.md; an
+(the lead's land-task.ps1 commits are listed); changes under docs/spectra/ other than tasks.md; an
 edited brief; and new or changed `git status` lines — for a worker only paths outside -Scope, for a
 reviewer any path. Paths under .herd/ and in -Ignore (e.g. parallel workers' files) are skipped.
 Prints {"ok":true} or {"ok":false,"issues":[…]} and exits 1 when not ok. Run from the repo root.
@@ -32,7 +32,7 @@ if ($new.head -ne $old.head) {
     git merge-base --is-ancestor $old.head $new.head
     if ($LASTEXITCODE -ne 0) { $issues.Add("HEAD moved off $($old.head) (reset or rewrite)") }
     else {
-        $logged = @(Select-String -Path ".herd/$Change.md" -Pattern ' commit ([0-9a-f]{40}) ' | ForEach-Object { $_.Matches[0].Groups[1].Value })
+        $logged = @(Select-String -Path ".herd/$Change.md" -Pattern ' land ([0-9a-f]{40}) ' | ForEach-Object { $_.Matches[0].Groups[1].Value })
         foreach ($c in @(git rev-list "$($old.head)..$($new.head)")) { if ($c -notin $logged) { $issues.Add("commit $c is not in the ledger") } }
     }
 }
