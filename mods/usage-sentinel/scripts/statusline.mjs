@@ -76,10 +76,15 @@ function sameCycle(a, b) {
   return Math.abs(a.resets_at - b.resets_at) < 60;
 }
 
+// 與 usage.mjs 的 RESET_DROP 相同：同一週期內大幅下降視為提前重置。
+const RESET_DROP = 10;
+
 function mergeWindow(existing, incoming) {
   if (!existing) return incoming;
   if (!sameCycle(existing, incoming)) return incoming.observed_at > existing.observed_at ? incoming : existing;
   const newer = incoming.observed_at >= existing.observed_at ? incoming : existing;
+  const older = newer === incoming ? existing : incoming;
+  if (older.pct - newer.pct >= RESET_DROP) return newer;
   return { ...newer, pct: Math.max(existing.pct, incoming.pct) };
 }
 

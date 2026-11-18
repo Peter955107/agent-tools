@@ -55,11 +55,16 @@ export function sameCycle(a, b) {
   return Math.abs(a.resets_at - b.resets_at) < 60;
 }
 
+// 同一週期內下降這麼多代表提前重置（重置券不改 resets_at）；小幅下降只是兩個來源的時間差。
+export const RESET_DROP = 10;
+
 // 兩個來源以較新的觀察為準；同一週期內百分比只升不降，避免舊資料蓋掉新資料（FR-1）。
 export function mergeWindow(existing, incoming) {
   if (!existing) return incoming;
   if (!sameCycle(existing, incoming)) return incoming.observed_at > existing.observed_at ? incoming : existing;
   const newer = incoming.observed_at >= existing.observed_at ? incoming : existing;
+  const older = newer === incoming ? existing : incoming;
+  if (older.pct - newer.pct >= RESET_DROP) return newer;
   return { ...newer, pct: Math.max(existing.pct, incoming.pct) };
 }
 

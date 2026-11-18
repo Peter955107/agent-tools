@@ -36,6 +36,15 @@ describe('mergeWindow', () => {
     assert.equal(merged.pct, 50);
   });
 
+  test('同一週期、較新且大幅下降（重置券提前重置）：採用新資料', () => {
+    const merged = mergeWindow(win(99, 100), win(72, 200));
+    assert.equal(merged.pct, 72);
+  });
+
+  test('同一週期、較舊且大幅較低：不會蓋掉較新的高值', () => {
+    assert.equal(mergeWindow(win(99, 200), win(72, 100)).pct, 99);
+  });
+
   test('不同週期：以較新的觀察為準（重置後可以下降）', () => {
     const merged = mergeWindow(win(95, 100), win(3, 200, { resetsAt: RESET + 18_000 }));
     assert.equal(merged.pct, 3);
